@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  output: 'standalone',
   webpack: (config, { isServer }) => {
     // Add specific configuration for @react-pdf/renderer
     if (!isServer) {
