@@ -1,0 +1,93 @@
+{
+  "staffName": "Russell",
+  "date": "2025-04-07",
+  "totalScore": 85,
+  "performanceLevel": "Strong",
+  "criteriaScores": [
+    {
+      "criterion": "Greeting and Introduction",
+      "weight": 10,
+      "score": 4,
+      "weightedScore": 4,
+      "notes": "Staff demonstrated excellent greeting skills when they said: 'hi my name is Russell and I'm going to be taking care of you today is this your first time at Milea estate'. They introduced themselves by name and asked if this was the guests' first visit, showing attentiveness to new customers."
+    },
+    {
+      "criterion": "Wine Knowledge",
+      "weight": 15,
+      "score": 4,
+      "weightedScore": 6,
+      "notes": "Staff demonstrated strong wine knowledge when they said: 'If you like reds, you'll really enjoy our Vincenza, which is our estate cabernet franc. It won a silver medal last year. It's named after Barry Milea's mother, so it has a special place in our hearts. It has nice notes of cherries, graphite.' They provided specific details about the wine's origin, awards, and tasting notes."
+    },
+    {
+      "criterion": "Tasting Experience Management",
+      "weight": 15,
+      "score": 5,
+      "weightedScore": 7.5,
+      "notes": "Staff demonstrated exceptional tasting experience management when they said: 'Since it's your first time here, I recommend trying our signature flight which includes 5 of our most popular wines. It's a great introduction to what we do here.' They tailored the experience to first-time visitors and explained the rationale behind their recommendation."
+    },
+    {
+      "criterion": "Storytelling",
+      "weight": 10,
+      "score": 3,
+      "weightedScore": 3,
+      "notes": "Staff demonstrated limited storytelling when they said: 'You can read a bit about our history on the back of the menu, but basically the property has been in the family for a while and they decided to plant vineyards about 10 years ago.' They directed guests to read the menu rather than engaging them with the winery's story. Suggestions: Develop a brief, engaging story about the winery's history that can be shared with guests. Include personal anecdotes about the family's connection to the land."
+    },
+    {
+      "criterion": "Food Pairing",
+      "weight": 10,
+      "score": 4,
+      "weightedScore": 4,
+      "notes": "Staff demonstrated good food pairing knowledge when they said: 'Yeah, it would go great with seafood pasta.' They recognized the guest's mention of seafood pasta and confirmed the pairing appropriateness."
+    },
+    {
+      "criterion": "Wine Club Promotion",
+      "weight": 10,
+      "score": 3,
+      "weightedScore": 3,
+      "notes": "Staff demonstrated limited wine club promotion when they didn't proactively discuss the wine club benefits after the guest mentioned: 'maybe we should consider joining your wine club?' Suggestions: When guests express interest in the wine club, proactively explain the benefits, such as allocations of popular wines, discounts, and exclusive events."
+    },
+    {
+      "criterion": "Sales Techniques",
+      "weight": 10,
+      "score": 4,
+      "weightedScore": 4,
+      "notes": "Staff demonstrated good sales techniques when they highlighted the award-winning status of the Vincenza wine: 'It won a silver medal last year.' They also mentioned its popularity: 'This is definitely one of our most popular wines.'"
+    },
+    {
+      "criterion": "Closing and Follow-up",
+      "weight": 5,
+      "score": 3,
+      "weightedScore": 1.5,
+      "notes": "Staff demonstrated limited closing skills when they said: 'Great, when I come back I will have your check be ready to check out.' They didn't ask if the guests would like to join the wine club or if they had any questions. Suggestions: Before closing, ask if guests would like to join the wine club and explain the benefits. Thank them for visiting and invite them to return."
+    },
+    {
+      "criterion": "Customer Engagement",
+      "weight": 10,
+      "score": 4,
+      "weightedScore": 4,
+      "notes": "Staff demonstrated good customer engagement when they asked: 'is this your first time at Milea estate' and responded to the guests' questions about the wines and property. They maintained conversation throughout the tasting."
+    },
+    {
+      "criterion": "Professionalism",
+      "weight": 5,
+      "score": 5,
+      "weightedScore": 2.5,
+      "notes": "Staff demonstrated exceptional professionalism throughout the conversation. They were attentive, knowledgeable, and courteous. They maintained a friendly yet professional demeanor."
+    }
+  ],
+  "strengths": [
+    "Excellent greeting and introduction, making guests feel welcome from the start",
+    "Strong wine knowledge, able to provide specific details about wines including awards and tasting notes",
+    "Good tasting experience management, tailoring recommendations to first-time visitors"
+  ],
+  "areasForImprovement": [
+    "Limited storytelling about the winery's history and family connection",
+    "Missed opportunity to promote wine club benefits when guests expressed interest",
+    "Basic closing skills without asking about wine club membership or future visits"
+  ],
+  "keyRecommendations": [
+    "Develop a brief, engaging story about the winery's history to share with guests instead of directing them to read the menu",
+    "Proactively explain wine club benefits when guests express interest, highlighting allocations of popular wines like the Vincenza",
+    "Improve closing by asking if guests would like to join the wine club and inviting them to return for future visits"
+  ]
+} 

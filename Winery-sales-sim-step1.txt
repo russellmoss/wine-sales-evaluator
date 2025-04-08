@@ -1,0 +1,25 @@
+I need you to evaluate the wine tasting conversation in the file "wine-tasting-conversation.md" against the criteria in "wines_sales_rubric.md". Then format your evaluation in the same JSON structure as shown in "evaluation_example.json".
+Please follow these instructions:
+
+Carefully analyze the conversation for evidence of each of the 10 weighted criteria in the rubric
+Score each criterion on a scale of 1-5 based on the detailed descriptions in the rubric
+Calculate the weighted score for each criterion (criterion score × weight)
+Calculate the overall percentage score (sum of weighted scores ÷ 500 × 100)
+Determine the performance level based on the score ranges in the rubric
+Include 3 specific strengths demonstrated in the conversation
+Include 3 specific areas for improvement
+Provide 3 actionable recommendations
+Write detailed notes for each criterion explaining the score
+
+Output your evaluation in exactly the same JSON format as in "evaluation_example.json", with the same field names and structure, including:
+
+staffName
+date (from the conversation)
+overallScore (as a number)
+performanceLevel
+criteriaScores (array with criterion, weight, score, weightedScore, and notes for each criterion)
+strengths (array of 3 strings)
+areasForImprovement (array of 3 strings)
+keyRecommendations (array of 3 strings)
+
+Your evaluation should be thorough, fair, and actionable while maintaining the exact JSON structure required.

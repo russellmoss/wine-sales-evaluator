@@ -1,0 +1,93 @@
+{
+    "staffName": "Russell",
+    "date": "2025-04-07",
+    "overallScore": 82,
+    "performanceLevel": "Strong",
+    "criteriaScores": [
+      {
+        "criterion": "Initial Greeting and Welcome",
+        "weight": 8,
+        "score": 3,
+        "weightedScore": 24,
+        "notes": "Russell introduced himself but the greeting lacked warmth and enthusiasm. He did not create an exciting first impression."
+      },
+      {
+        "criterion": "Building Rapport",
+        "weight": 10,
+        "score": 4,
+        "weightedScore": 40,
+        "notes": "Good job asking where guests were from and connecting that to wine club benefits. Could have asked more personal questions earlier."
+      },
+      {
+        "criterion": "Winery History and Ethos",
+        "weight": 10,
+        "score": 3,
+        "weightedScore": 30,
+        "notes": "Briefly mentioned winemaking philosophy focusing on vineyard expression but didn't share much about Milea's history or founding story."
+      },
+      {
+        "criterion": "Storytelling and Analogies",
+        "weight": 10,
+        "score": 3,
+        "weightedScore": 30,
+        "notes": "Used some analogies like 'tasting sunlight and soil' but could develop more vivid stories around specific wines."
+      },
+      {
+        "criterion": "Recognition of Buying Signals",
+        "weight": 12,
+        "score": 4,
+        "weightedScore": 48,
+        "notes": "Recognized enthusiasm about wines and held bottles aside. Effectively transitioned to wine club when guests showed interest."
+      },
+      {
+        "criterion": "Customer Data Capture",
+        "weight": 8,
+        "score": 4,
+        "weightedScore": 32,
+        "notes": "Successfully captured contact information through wine club signup and provided clear benefits for sharing information."
+      },
+      {
+        "criterion": "Asking for the Sale",
+        "weight": 12,
+        "score": 5,
+        "weightedScore": 60,
+        "notes": "Made excellent direct asks for wine club signup and case purchase with clear incentives (20% discount, rewards points)."
+      },
+      {
+        "criterion": "Personalized Wine Recommendations",
+        "weight": 10,
+        "score": 4,
+        "weightedScore": 40,
+        "notes": "Made good food pairing recommendations and suggested specific wines based on guests' reactions."
+      },
+      {
+        "criterion": "Wine Club Presentation",
+        "weight": 12,
+        "score": 5,
+        "weightedScore": 60,
+        "notes": "Excellent presentation of wine club with clear benefits, tiers, and personalized suggestions for the guests."
+      },
+      {
+        "criterion": "Closing Interaction",
+        "weight": 8,
+        "score": 4,
+        "weightedScore": 32,
+        "notes": "Warm goodbye with promise to help load purchases and expression of looking forward to seeing guests at future events."
+      }
+    ],
+    "strengths": [
+      "Excellent wine club presentation with clear explanation of benefits, tiers, and personalization",
+      "Strong closing techniques with specific incentives for case purchases",
+      "Good recognition of buying signals and timely transition to sales opportunities"
+    ],
+    "areasForImprovement": [
+      "More enthusiastic and personalized initial greeting",
+      "Earlier rapport building with more personal questions",
+      "More detailed storytelling around winery history and specific wines"
+    ],
+    "keyRecommendations": [
+      "Develop a standard but personalized greeting script that creates excitement",
+      "Create 2-3 compelling stories about the winery's founding and history",
+      "Practice wine-specific analogies and stories that make each wine memorable"
+    ]
+  }
