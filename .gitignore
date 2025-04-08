@@ -74,4 +74,7 @@ pids
 *.tgz
 
 # Yarn Integrity file
-.yarn-integrity 
+.yarn-integrity
+
+# Dashboard directory
+/dashboard/ 
