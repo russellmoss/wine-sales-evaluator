@@ -15,7 +15,7 @@ interface JobStatus {
 }
 
 // Define the path to the jobs directory
-const JOBS_DIR = path.join(process.cwd(), 'tmp', 'jobs');
+const JOBS_DIR = '/tmp/jobs';
 
 // Cache for rubric and example evaluation
 let cachedRubric: string | null = null;
@@ -199,6 +199,25 @@ const loadEvaluationExample = () => {
   return cachedEvaluationExample;
 };
 
+interface CriteriaScore {
+  criterion: string;
+  weight: number;
+  score: number;
+  weightedScore: number;
+  notes: string;
+}
+
+interface EvaluationData {
+  staffName: string;
+  date: string;
+  overallScore: number;
+  performanceLevel: string;
+  criteriaScores: CriteriaScore[];
+  strengths: string[];
+  areasForImprovement: string[];
+  keyRecommendations: string[];
+}
+
 // Process a job
 const processJob = async (jobId: string, markdown: string, fileName: string) => {
   console.log(`Background function: Processing job ${jobId}`);
@@ -300,39 +319,65 @@ Return ONLY THE JSON with no additional text.`;
     
     console.log('Background function: Extracting JSON from Claude response');
     // Extract JSON from Claude's response
-    let evaluationData;
+    let evaluationData: EvaluationData;
     try {
       // First try to extract JSON if it's wrapped in markdown code blocks
       const jsonMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-      if (jsonMatch && jsonMatch[1]) {
-        console.log('Background function: Found JSON in markdown code block');
-        evaluationData = JSON.parse(jsonMatch[1].trim());
-      } else {
-        console.log('Background function: Parsing entire response as JSON');
-        evaluationData = JSON.parse(responseText.trim());
-      }
+      let jsonText = jsonMatch ? jsonMatch[1].trim() : responseText.trim();
+      
+      // Clean up any potential markdown formatting
+      jsonText = jsonText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+      
+      console.log('Background function: Attempting to parse JSON');
+      evaluationData = JSON.parse(jsonText) as EvaluationData;
       
       console.log('Background function: Validating JSON structure');
       // Validate the structure of the received JSON
       const requiredFields = ['staffName', 'date', 'overallScore', 'performanceLevel', 
                              'criteriaScores', 'strengths', 'areasForImprovement', 'keyRecommendations'];
       
-      for (const field of requiredFields) {
-        if (!evaluationData[field]) {
-          throw new Error(`Missing required field: ${field}`);
-        }
+      const missingFields = requiredFields.filter(field => !evaluationData[field as keyof EvaluationData]);
+      if (missingFields.length > 0) {
+        throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
       }
       
       // Ensure criteriaScores is properly formatted
-      if (!Array.isArray(evaluationData.criteriaScores) || evaluationData.criteriaScores.length !== 10) {
-        throw new Error('criteriaScores must be an array with 10 items');
+      if (!Array.isArray(evaluationData.criteriaScores)) {
+        throw new Error('criteriaScores must be an array');
       }
+      
+      if (evaluationData.criteriaScores.length !== 10) {
+        throw new Error(`criteriaScores must have exactly 10 items, found ${evaluationData.criteriaScores.length}`);
+      }
+      
+      // Validate each criteria score entry
+      evaluationData.criteriaScores.forEach((score: CriteriaScore, index: number) => {
+        const requiredScoreFields = ['criterion', 'weight', 'score', 'weightedScore', 'notes'];
+        const missingScoreFields = requiredScoreFields.filter(field => !score[field as keyof CriteriaScore]);
+        if (missingScoreFields.length > 0) {
+          throw new Error(`Criteria score ${index + 1} missing fields: ${missingScoreFields.join(', ')}`);
+        }
+      });
       
       // Convert overallScore to a number if it's a string
       if (typeof evaluationData.overallScore === 'string') {
         console.log('Background function: Converting overallScore from string to number');
-        evaluationData.overallScore = parseInt(evaluationData.overallScore, 10);
+        evaluationData.overallScore = parseFloat(evaluationData.overallScore);
+        if (isNaN(evaluationData.overallScore)) {
+          throw new Error('overallScore could not be converted to a number');
+        }
       }
+      
+      // Ensure arrays have exactly 3 items
+      ['strengths', 'areasForImprovement', 'keyRecommendations'].forEach(field => {
+        const arrayField = field as keyof Pick<EvaluationData, 'strengths' | 'areasForImprovement' | 'keyRecommendations'>;
+        if (!Array.isArray(evaluationData[arrayField])) {
+          throw new Error(`${field} must be an array`);
+        }
+        if (evaluationData[arrayField].length !== 3) {
+          throw new Error(`${field} must have exactly 3 items, found ${evaluationData[arrayField].length}`);
+        }
+      });
       
       console.log('Background function: JSON validation successful');
       
