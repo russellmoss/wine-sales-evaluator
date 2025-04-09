@@ -508,7 +508,17 @@ export const handler: Handler = async (event: HandlerEvent, context: HandlerCont
     job.fileName = fileName;
     job.createdAt = Date.now();
     job.updatedAt = Date.now();
+    
+    // Save the job first and verify it was saved
     await storage.saveJob(job);
+    
+    // Verify the job was saved by trying to retrieve it
+    const savedJob = await storage.getJob(job.id);
+    if (!savedJob) {
+      throw new Error('Failed to save job - job not found after saving');
+    }
+    
+    console.log(`Main function: Created and saved job ${job.id} with status ${job.status}`);
 
     // Call the background function
     const response = await fetch(`${process.env.URL}/.netlify/functions/analyze-conversation-background`, {

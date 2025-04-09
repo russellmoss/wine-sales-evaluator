@@ -5,6 +5,14 @@ import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { getStorageProvider, JobStatus } from '../../app/utils/storage';
 
+// Add diagnostic logging
+console.log('Background function: Starting with environment:', {
+  NODE_ENV: process.env.NODE_ENV,
+  NETLIFY: process.env.NETLIFY,
+  PWD: process.cwd(),
+  dirContents: fs.existsSync('/var/task') ? fs.readdirSync('/var/task') : 'Directory not found'
+});
+
 // Cache for rubric and example evaluation
 let cachedRubric: string | null = null;
 let cachedEvaluationExample: string | null = null;
@@ -14,32 +22,46 @@ const JOBS_DIR = '/tmp/jobs';
 
 // Ensure the jobs directory exists
 const ensureJobsDir = () => {
-  if (!fs.existsSync(JOBS_DIR)) {
-    fs.mkdirSync(JOBS_DIR, { recursive: true });
+  try {
+    if (!fs.existsSync(JOBS_DIR)) {
+      console.log('Background function: Creating jobs directory:', JOBS_DIR);
+      fs.mkdirSync(JOBS_DIR, { recursive: true });
+    }
+  } catch (error) {
+    console.error('Background function: Error ensuring jobs directory exists:', error);
+    throw new Error(`Failed to create jobs directory: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 };
 
 // Save a job to the filesystem
 const saveJob = (job: JobStatus) => {
-  ensureJobsDir();
-  const jobPath = path.join(JOBS_DIR, `${job.id}.json`);
-  fs.writeFileSync(jobPath, JSON.stringify(job, null, 2));
+  try {
+    ensureJobsDir();
+    const jobPath = path.join(JOBS_DIR, `${job.id}.json`);
+    console.log('Background function: Saving job to:', jobPath);
+    fs.writeFileSync(jobPath, JSON.stringify(job, null, 2));
+  } catch (error) {
+    console.error('Background function: Error saving job:', error);
+    throw new Error(`Failed to save job: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
 };
 
 // Get a job by ID
 const getJob = (jobId: string): JobStatus | null => {
-  ensureJobsDir();
-  const jobPath = path.join(JOBS_DIR, `${jobId}.json`);
-  
-  if (!fs.existsSync(jobPath)) {
-    return null;
-  }
-  
   try {
+    ensureJobsDir();
+    const jobPath = path.join(JOBS_DIR, `${jobId}.json`);
+    console.log('Background function: Reading job from:', jobPath);
+    
+    if (!fs.existsSync(jobPath)) {
+      console.log('Background function: Job file not found:', jobPath);
+      return null;
+    }
+    
     const jobData = fs.readFileSync(jobPath, 'utf8');
     return JSON.parse(jobData) as JobStatus;
   } catch (error) {
-    console.error(`Error reading job ${jobId}:`, error);
+    console.error(`Background function: Error reading job ${jobId}:`, error);
     return null;
   }
 };
@@ -269,6 +291,8 @@ const EMBEDDED_EVALUATION_EXAMPLE = {
 
 // Load the rubric with caching
 const loadRubric = () => {
+  console.log('Background function: Loading rubric, cached:', !!cachedRubric);
+  
   if (cachedRubric) {
     console.log('Background function: Using cached rubric');
     return cachedRubric;
@@ -281,6 +305,8 @@ const loadRubric = () => {
 
 // Load the example evaluation with caching
 const loadEvaluationExample = () => {
+  console.log('Background function: Loading evaluation example, cached:', !!cachedEvaluationExample);
+  
   if (cachedEvaluationExample) {
     console.log('Background function: Using cached evaluation example');
     return cachedEvaluationExample;
@@ -670,12 +696,30 @@ const processJob = async (jobId: string, markdown: string, fileName: string) => 
   // Get the storage provider
   const storage = getStorageProvider();
   
-  // Update job status to processing
-  const job = await storage.getJob(jobId);
-  if (!job) {
-    throw new Error(`Job ${jobId} not found`);
+  // Get the job with retries
+  let job = null;
+  let retryCount = 0;
+  const maxRetries = 3;
+  
+  while (!job && retryCount < maxRetries) {
+    job = await storage.getJob(jobId);
+    if (!job) {
+      console.log(`Background function: Job ${jobId} not found, retry ${retryCount + 1}/${maxRetries}`);
+      retryCount++;
+      if (retryCount < maxRetries) {
+        // Wait for 1 second before retrying
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
   }
   
+  if (!job) {
+    throw new Error(`Job ${jobId} not found after ${maxRetries} retries`);
+  }
+  
+  console.log(`Background function: Retrieved job ${jobId} with status ${job.status}`);
+  
+  // Update job status to processing
   job.status = 'processing';
   job.updatedAt = Date.now();
   await storage.saveJob(job);
