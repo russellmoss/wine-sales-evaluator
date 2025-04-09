@@ -14,7 +14,7 @@ interface JobStatus {
 }
 
 // Define the path to the jobs directory
-const JOBS_DIR = path.join(process.cwd(), 'tmp', 'jobs');
+const JOBS_DIR = '/tmp/jobs';
 
 // Ensure the jobs directory exists
 const ensureJobsDir = () => {
