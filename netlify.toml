@@ -9,6 +9,7 @@
   NODE_ENV = "production"
   DEBUG = "*"
   NPM_FLAGS = "--legacy-peer-deps"
+  CLAUDE_API_KEY = ""
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
@@ -19,12 +20,23 @@
 
 [[functions]]
   pattern = "analyze-conversation"
-  included_files = ["public/data/*", "tmp/**/*"]
-  timeout = 300
+  included_files = ["public/data/*"]
+  timeout = 60
 
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/api/analyze-conversation"
+  to = "/.netlify/functions/analyze-conversation"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
   status = 200
 
 [dev]
@@ -55,15 +67,4 @@
   pretty_urls = true
 
 [build.processing.images]
-  compress = true
-
-[[redirects]]
-  from = "/api/analyze-conversation"
-  to = "/.netlify/functions/analyze-conversation"
-  status = 200
-  force = true
-
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200 
+  compress = true 

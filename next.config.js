@@ -1,8 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  output: 'export',
-  distDir: 'out',
+  output: 'standalone',
   images: {
     unoptimized: true,
   },
@@ -12,9 +11,8 @@ const nextConfig = {
   webpack: (config, { isServer }) => {
     // Add specific configuration for @react-pdf/renderer
     if (!isServer) {
-      config.resolve.alias = {
-        ...config.resolve.alias,
-        // Ensure canvas is properly handled in the browser
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
         canvas: false,
       };
     }
