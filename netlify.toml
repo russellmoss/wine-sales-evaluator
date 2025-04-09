@@ -16,8 +16,6 @@
 [functions]
   node_bundler = "esbuild"
   external_node_modules = ["@anthropic-ai/sdk", "uuid"]
-
-[[functions]]
   pattern = "analyze-conversation"
   included_files = ["public/data/*"]
   timeout = 60
