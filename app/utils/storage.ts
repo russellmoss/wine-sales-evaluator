@@ -27,34 +27,49 @@ export interface StorageProvider {
 
 // Netlify KV Store provider
 export class KVStorageProvider implements StorageProvider {
-  private store;
+  private store: any; // Using any type since @netlify/blobs doesn't export types
   private maxAge: number;
+  private isInitialized: boolean = false;
 
   constructor(maxAge: number = 24 * 60 * 60 * 1000) { // Default: 24 hours
-    // Check if we're in a Netlify environment
-    if (process.env.NETLIFY === 'true') {
-      // Get site ID and token from environment variables
-      const siteID = process.env.NETLIFY_SITE_ID;
-      const token = process.env.NETLIFY_ACCESS_TOKEN;
-      
-      if (!siteID || !token) {
-        console.error('Netlify Blobs configuration missing. Please set NETLIFY_SITE_ID and NETLIFY_ACCESS_TOKEN environment variables.');
-        throw new Error('Netlify Blobs configuration missing. Please set NETLIFY_SITE_ID and NETLIFY_ACCESS_TOKEN environment variables.');
-      }
-      
-      // Set environment variables for Netlify Blobs
-      process.env.NETLIFY_SITE_ID = siteID;
-      process.env.NETLIFY_ACCESS_TOKEN = token;
-      
-      // Initialize the store
-      this.store = getStore('wine-analysis-jobs');
-    } else {
-      // For local development, use a fallback or mock implementation
-      console.warn('Not in Netlify environment. Using fallback storage for local development.');
-      this.store = getStore('wine-analysis-jobs');
-    }
-    
     this.maxAge = maxAge;
+    this.initializeStore();
+  }
+
+  private initializeStore(): void {
+    try {
+      // Check if we're in a Netlify environment
+      if (process.env.NETLIFY === 'true') {
+        console.log('Initializing Netlify Blobs store in Netlify environment');
+        
+        // Get site ID and token from environment variables
+        const siteID = process.env.NETLIFY_SITE_ID;
+        const token = process.env.NETLIFY_ACCESS_TOKEN;
+        
+        if (!siteID || !token) {
+          console.error('Netlify Blobs configuration missing. Please set NETLIFY_SITE_ID and NETLIFY_ACCESS_TOKEN environment variables.');
+          throw new Error('Netlify Blobs configuration missing. Please set NETLIFY_SITE_ID and NETLIFY_ACCESS_TOKEN environment variables.');
+        }
+        
+        // Set environment variables for Netlify Blobs
+        process.env.NETLIFY_SITE_ID = siteID;
+        process.env.NETLIFY_ACCESS_TOKEN = token;
+        
+        // Initialize the store
+        this.store = getStore('wine-analysis-jobs');
+        this.isInitialized = true;
+        console.log('Netlify Blobs store initialized successfully');
+      } else {
+        // For local development, use a fallback or mock implementation
+        console.warn('Not in Netlify environment. Using fallback storage for local development.');
+        this.store = getStore('wine-analysis-jobs');
+        this.isInitialized = true;
+      }
+    } catch (error) {
+      console.error('Failed to initialize Netlify Blobs store:', error);
+      this.isInitialized = false;
+      throw error;
+    }
   }
 
   async saveJob(job: JobStatus): Promise<void> {
@@ -63,13 +78,28 @@ export class KVStorageProvider implements StorageProvider {
       job.expiresAt = Date.now() + this.maxAge;
     }
     
+    if (!this.isInitialized) {
+      console.error('Cannot save job: Netlify Blobs store not initialized');
+      throw new Error('Netlify Blobs store not initialized');
+    }
+    
     console.log(`KV Store: Saving job ${job.id} with status ${job.status}`);
-    // Store the job data with the expiration time included in the job object
-    await this.store.set(job.id, JSON.stringify(job));
-    console.log(`KV Store: Job ${job.id} saved successfully`);
+    try {
+      // Store the job data with the expiration time included in the job object
+      await this.store.set(job.id, JSON.stringify(job));
+      console.log(`KV Store: Job ${job.id} saved successfully`);
+    } catch (error) {
+      console.error(`KV Store: Error saving job ${job.id}:`, error);
+      throw new Error(`Failed to save job: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 
   async getJob(jobId: string): Promise<JobStatus | null> {
+    if (!this.isInitialized) {
+      console.error('Cannot get job: Netlify Blobs store not initialized');
+      return null;
+    }
+    
     console.log(`KV Store: Retrieving job ${jobId}`);
     try {
       const jobData = await this.store.get(jobId);
@@ -89,6 +119,11 @@ export class KVStorageProvider implements StorageProvider {
   }
 
   async listJobs(): Promise<JobStatus[]> {
+    if (!this.isInitialized) {
+      console.error('Cannot list jobs: Netlify Blobs store not initialized');
+      return [];
+    }
+    
     console.log(`KV Store: Listing all jobs`);
     try {
       // Note: Netlify Blobs doesn't have a native list function
@@ -103,6 +138,11 @@ export class KVStorageProvider implements StorageProvider {
   }
 
   async deleteJob(jobId: string): Promise<boolean> {
+    if (!this.isInitialized) {
+      console.error('Cannot delete job: Netlify Blobs store not initialized');
+      return false;
+    }
+    
     console.log(`KV Store: Deleting job ${jobId}`);
     try {
       await this.store.delete(jobId);
@@ -115,6 +155,11 @@ export class KVStorageProvider implements StorageProvider {
   }
 
   async cleanupExpiredJobs(): Promise<number> {
+    if (!this.isInitialized) {
+      console.error('Cannot cleanup jobs: Netlify Blobs store not initialized');
+      return 0;
+    }
+    
     // Netlify Blobs automatically cleans up expired entries
     console.log(`KV Store: Cleanup not needed - Netlify automatically expires entries`);
     return 0;
@@ -364,19 +409,39 @@ export function createStorageProvider(): StorageProvider {
   
   console.log(`Initializing ${storageType} storage provider`);
   
+  // Check if we're in a Netlify environment
+  const isNetlify = process.env.NETLIFY === 'true';
+  console.log(`Environment: ${isNetlify ? 'Netlify' : 'Local development'}`);
+  
+  // Check if Netlify Blobs is configured
+  const hasBlobsConfig = !!(process.env.NETLIFY_SITE_ID && process.env.NETLIFY_ACCESS_TOKEN);
+  console.log(`Netlify Blobs configuration: ${hasBlobsConfig ? 'Available' : 'Missing'}`);
+  
   try {
     switch (storageType.toLowerCase()) {
       case 'kv':
+        if (isNetlify && !hasBlobsConfig) {
+          console.warn('Netlify Blobs configuration missing. Falling back to memory storage.');
+          return new MemoryStorageProvider(maxAge);
+        }
         return new KVStorageProvider(maxAge);
       case 'memory':
         return new MemoryStorageProvider(maxAge);
       case 'file':
-        throw new Error('File storage is not reliable in Netlify Functions, use KV store instead');
+        if (isNetlify) {
+          console.warn('File storage is not reliable in Netlify Functions. Using memory storage instead.');
+          return new MemoryStorageProvider(maxAge);
+        }
+        return new FileStorageProvider('/tmp/jobs', maxAge);
       default:
+        if (isNetlify && !hasBlobsConfig) {
+          console.warn('Netlify Blobs configuration missing. Falling back to memory storage.');
+          return new MemoryStorageProvider(maxAge);
+        }
         return new KVStorageProvider(maxAge);
     }
   } catch (error) {
-    console.error('Error initializing KV storage provider:', error);
+    console.error('Error initializing storage provider:', error);
     console.log('Falling back to memory storage provider');
     return new MemoryStorageProvider(maxAge);
   }
@@ -388,7 +453,14 @@ let storageProvider: StorageProvider | null = null;
 // Get the storage provider instance
 export function getStorageProvider(): StorageProvider {
   if (!storageProvider) {
-    storageProvider = createStorageProvider();
+    try {
+      storageProvider = createStorageProvider();
+      console.log('Storage provider initialized successfully');
+    } catch (error) {
+      console.error('Failed to initialize storage provider:', error);
+      console.log('Falling back to memory storage provider');
+      storageProvider = new MemoryStorageProvider();
+    }
   }
   return storageProvider;
 }
