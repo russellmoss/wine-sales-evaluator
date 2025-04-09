@@ -82,23 +82,32 @@ export class FileStorageProvider implements StorageProvider {
     this.ensureJobsDir();
     const jobPath = path.join(this.jobsDir, `${jobId}.json`);
     
+    // Add debug logging
+    console.log(`Storage: Checking for job file at: ${jobPath}`);
+    console.log(`Storage: File exists: ${fs.existsSync(jobPath)}`);
+    
     try {
       if (!fs.existsSync(jobPath)) {
+        console.log(`Storage: Job file not found: ${jobPath}`);
+        // List all files in the directory for debugging
+        console.log(`Storage: Files in directory: ${fs.readdirSync(this.jobsDir)}`);
         return null;
       }
       
       const jobData = await fs.promises.readFile(jobPath, 'utf8');
+      console.log(`Storage: Job data read, length: ${jobData.length}`);
       const job = JSON.parse(jobData) as JobStatus;
       
       // Check if job has expired
       if (job.expiresAt && job.expiresAt < Date.now()) {
-        console.log(`Job ${jobId} has expired`);
+        console.log(`Storage: Job ${jobId} has expired at ${new Date(job.expiresAt).toISOString()}`);
         return null;
       }
       
+      console.log(`Storage: Successfully retrieved job ${jobId} with status: ${job.status}`);
       return job;
     } catch (error) {
-      console.error(`Error reading job ${jobId}:`, error);
+      console.error(`Storage: Error reading job ${jobId}:`, error);
       return null;
     }
   }

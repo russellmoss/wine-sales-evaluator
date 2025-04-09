@@ -20,12 +20,31 @@ let cachedEvaluationExample: string | null = null;
 // Define the path to the jobs directory
 const JOBS_DIR = '/tmp/jobs';
 
+// Add diagnostic logging for directory state
+const logDirectoryState = () => {
+  try {
+    console.log('Background function: Current directory state:', {
+      cwd: process.cwd(),
+      jobsDirExists: fs.existsSync(JOBS_DIR),
+      jobsDirPath: JOBS_DIR,
+      jobsDirContents: fs.existsSync(JOBS_DIR) ? fs.readdirSync(JOBS_DIR) : 'Directory not found',
+      tmpDirExists: fs.existsSync('/tmp'),
+      tmpDirContents: fs.existsSync('/tmp') ? fs.readdirSync('/tmp') : 'Directory not found'
+    });
+  } catch (error) {
+    console.error('Background function: Error logging directory state:', error);
+  }
+};
+
 // Ensure the jobs directory exists
 const ensureJobsDir = () => {
   try {
+    logDirectoryState();
     if (!fs.existsSync(JOBS_DIR)) {
       console.log('Background function: Creating jobs directory:', JOBS_DIR);
       fs.mkdirSync(JOBS_DIR, { recursive: true });
+      console.log('Background function: Jobs directory created successfully');
+      logDirectoryState();
     }
   } catch (error) {
     console.error('Background function: Error ensuring jobs directory exists:', error);
@@ -39,7 +58,23 @@ const saveJob = (job: JobStatus) => {
     ensureJobsDir();
     const jobPath = path.join(JOBS_DIR, `${job.id}.json`);
     console.log('Background function: Saving job to:', jobPath);
+    console.log('Background function: Job data:', JSON.stringify(job, null, 2));
     fs.writeFileSync(jobPath, JSON.stringify(job, null, 2));
+    
+    // Verify the file was written
+    if (fs.existsSync(jobPath)) {
+      const fileStats = fs.statSync(jobPath);
+      const fileContents = fs.readFileSync(jobPath, 'utf8');
+      console.log('Background function: Job file verification:', {
+        exists: true,
+        size: fileStats.size,
+        created: fileStats.birthtime,
+        modified: fileStats.mtime,
+        contents: fileContents.substring(0, 200) + '...' // Log first 200 chars
+      });
+    } else {
+      console.error('Background function: Job file was not created successfully');
+    }
   } catch (error) {
     console.error('Background function: Error saving job:', error);
     throw new Error(`Failed to save job: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -55,13 +90,29 @@ const getJob = (jobId: string): JobStatus | null => {
     
     if (!fs.existsSync(jobPath)) {
       console.log('Background function: Job file not found:', jobPath);
+      logDirectoryState();
       return null;
     }
     
+    const fileStats = fs.statSync(jobPath);
+    console.log('Background function: Job file stats:', {
+      size: fileStats.size,
+      created: fileStats.birthtime,
+      modified: fileStats.mtime
+    });
+    
     const jobData = fs.readFileSync(jobPath, 'utf8');
-    return JSON.parse(jobData) as JobStatus;
+    const job = JSON.parse(jobData) as JobStatus;
+    console.log('Background function: Successfully read job:', {
+      id: job.id,
+      status: job.status,
+      createdAt: job.createdAt,
+      updatedAt: job.updatedAt
+    });
+    return job;
   } catch (error) {
     console.error(`Background function: Error reading job ${jobId}:`, error);
+    logDirectoryState();
     return null;
   }
 };

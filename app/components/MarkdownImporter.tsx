@@ -57,29 +57,49 @@ const MarkdownImporter: FC<MarkdownImporterProps> = ({ onAnalysisComplete, isAna
       // Poll for job status
       let completed = false;
       let result = null;
+      let retryCount = 0;
+      let errorCount = 0;
 
       while (!completed) {
         // Wait 3 seconds between polls
         await new Promise(resolve => setTimeout(resolve, 3000));
         
-        const statusResponse = await fetch(`/.netlify/functions/check-job-status?jobId=${jobId}`, {
-          method: 'GET'
-        });
-        
-        if (!statusResponse.ok) {
-          throw new Error(`Error checking status: ${statusResponse.status}`);
+        try {
+          const statusResponse = await fetch(`/.netlify/functions/check-job-status?jobId=${jobId}`, {
+            method: 'GET'
+          });
+          
+          // If the job isn't found (404), retry a few times before giving up
+          if (statusResponse.status === 404) {
+            retryCount = (retryCount || 0) + 1;
+            if (retryCount > 5) {
+              throw new Error('Job not found after multiple retries');
+            }
+            console.log(`Job not found yet, retry ${retryCount}/5`);
+            continue;
+          }
+          
+          if (!statusResponse.ok) {
+            throw new Error(`Error checking status: ${statusResponse.status}`);
+          }
+          
+          const job = await statusResponse.json();
+          
+          if (job.status === 'completed') {
+            completed = true;
+            result = job.result;
+          } else if (job.status === 'failed') {
+            throw new Error(job.error || 'Analysis failed');
+          } else {
+            console.log(`Current job status: ${job.status}`);
+          }
+        } catch (error) {
+          console.error('Error checking job status:', error);
+          errorCount = (errorCount || 0) + 1;
+          if (errorCount > 3) {
+            throw error;
+          }
         }
-        
-        const job = await statusResponse.json();
-        
-        if (job.status === 'completed') {
-          completed = true;
-          result = job.result;
-        } else if (job.status === 'failed') {
-          throw new Error(job.error || 'Analysis failed');
-        }
-        
-        // If still processing, continue polling
       }
 
       // Validate the evaluation data
