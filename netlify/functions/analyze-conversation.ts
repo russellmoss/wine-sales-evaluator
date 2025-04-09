@@ -473,144 +473,73 @@ export const handler: Handler = async (event: HandlerEvent, context: HandlerCont
     hasBody: !!event.body,
     contentLength: event.body?.length
   });
-  
-  // For GET requests, check job status
-  if (event.httpMethod === 'GET') {
-    try {
-      const jobId = event.queryStringParameters?.jobId;
-      
-      if (!jobId) {
-        return {
-          statusCode: 400,
-          body: JSON.stringify({ error: 'No job ID provided' })
-        };
-      }
-      
-      console.log(`Main function: Checking status for job ${jobId}`);
-      
-      // Get the storage provider
-      const storage = getStorageProvider();
-      
-      // Get the job
-      const job = await storage.getJob(jobId);
-      
-      if (!job) {
-        return {
-          statusCode: 404,
-          body: JSON.stringify({ error: 'Job not found' })
-        };
-      }
-      
-      console.log(`Main function: Job ${jobId} status: ${job.status}`);
-      
+
+  if (event.httpMethod !== 'POST') {
+    return {
+      statusCode: 405,
+      body: JSON.stringify({ error: 'Method not allowed' })
+    };
+  }
+
+  try {
+    if (!event.body) {
       return {
-        statusCode: 200,
-        body: JSON.stringify(job)
-      };
-    } catch (error) {
-      console.error('Main function: Error checking job status:', error);
-      return {
-        statusCode: 500,
-        body: JSON.stringify({ error: 'Internal server error' })
+        statusCode: 400,
+        body: JSON.stringify({ error: 'No request body provided' })
       };
     }
-  }
-  
-  // For POST requests, do direct evaluation instead of using background functions
-  if (event.httpMethod === 'POST') {
-    try {
-      if (!event.body) {
-        return {
-          statusCode: 400,
-          body: JSON.stringify({ error: 'No request body provided' })
-        };
-      }
-      
-      const { markdown, fileName } = JSON.parse(event.body);
-      
-      if (!markdown) {
-        return {
-          statusCode: 400,
-          body: JSON.stringify({ error: 'No markdown content provided' })
-        };
-      }
-      
-      if (!process.env.CLAUDE_API_KEY) {
-        return {
-          statusCode: 500,
-          body: JSON.stringify({ error: 'Claude API key not configured' })
-        };
-      }
-      
-      // Create a job to track the evaluation
-      const job = createJob();
-      const storage = getStorageProvider();
-      
-      // Save the job
-      await storage.saveJob(job);
-      
-      // Perform direct evaluation
-      try {
-        console.log('Main function: Starting direct evaluation');
-        
-        // Truncate the conversation if needed
-        const truncatedMarkdown = truncateConversation(markdown);
-        
-        // Try direct evaluation first
-        let evaluationData;
-        try {
-          evaluationData = await evaluateDirectly(truncatedMarkdown);
-          console.log('Main function: Direct evaluation successful');
-        } catch (directError) {
-          console.error('Main function: Direct evaluation failed, trying fallback:', directError);
-          
-          // If direct evaluation fails, try the fallback
-          evaluationData = await performBasicEvaluation(truncatedMarkdown);
-          console.log('Main function: Fallback evaluation successful');
-        }
-        
-        // Validate and repair the evaluation data
-        const validatedData = validateAndRepairEvaluationData(evaluationData, truncatedMarkdown);
-        
-        // Update the job with the result
-        job.status = 'completed';
-        job.result = validatedData;
-        job.updatedAt = Date.now();
-        await storage.saveJob(job);
-        
-        return {
-          statusCode: 200,
-          body: JSON.stringify(validatedData)
-        };
-      } catch (evalError) {
-        console.error('Error in evaluation:', evalError);
-        
-        // Update the job with the error
-        job.status = 'failed';
-        job.error = evalError instanceof Error ? evalError.message : 'Unknown error';
-        job.updatedAt = Date.now();
-        await storage.saveJob(job);
-        
-        return {
-          statusCode: 500,
-          body: JSON.stringify({ 
-            error: 'Error evaluating conversation', 
-            message: evalError instanceof Error ? evalError.message : 'Unknown error' 
-          })
-        };
-      }
-    } catch (error) {
-      console.error('Main function: Error processing request:', error);
+
+    const { markdown, fileName } = JSON.parse(event.body);
+
+    if (!markdown) {
       return {
-        statusCode: 500,
-        body: JSON.stringify({ error: 'Internal server error' })
+        statusCode: 400,
+        body: JSON.stringify({ error: 'No markdown content provided' })
       };
     }
+
+    // Get the storage provider
+    const storage = getStorageProvider();
+
+    // Create a new job
+    const job = createJob();
+    job.status = 'pending';
+    job.markdown = markdown;
+    job.fileName = fileName;
+    job.createdAt = Date.now();
+    job.updatedAt = Date.now();
+    await storage.saveJob(job);
+
+    // Call the background function
+    const response = await fetch(`${process.env.URL}/.netlify/functions/analyze-conversation-background`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        jobId: job.id,
+        markdown,
+        fileName
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Background function returned ${response.status}`);
+    }
+
+    // Return the job ID immediately
+    return {
+      statusCode: 202,
+      body: JSON.stringify({
+        message: 'Analysis started',
+        jobId: job.id
+      })
+    };
+  } catch (error) {
+    console.error('Main function: Error processing request:', error);
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: 'Internal server error' })
+    };
   }
-  
-  // For any other HTTP method
-  return {
-    statusCode: 405,
-    body: JSON.stringify({ error: 'Method not allowed' })
-  };
 }; 

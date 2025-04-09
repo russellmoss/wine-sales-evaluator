@@ -3,6 +3,8 @@
 import React, { useState, useRef } from 'react';
 import { toast } from 'react-hot-toast';
 import type { WineEvaluation } from '@/types/evaluation';
+import { validateEvaluationData } from '../utils/validation';
+import { EvaluationData } from '../types/evaluation';
 
 interface MarkdownImporterProps {
   onAnalysisComplete: (evaluationData: WineEvaluation) => void;
@@ -42,8 +44,8 @@ const MarkdownImporter: React.FC<MarkdownImporterProps> = ({
     setIsAnalyzing(true);
     
     try {
-      // Call the API to analyze the conversation
-      const response = await fetch('/api/analyze-conversation', {
+      // Start the analysis job
+      const response = await fetch('/.netlify/functions/analyze-conversation', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -59,14 +61,52 @@ const MarkdownImporter: React.FC<MarkdownImporterProps> = ({
         throw new Error(errorData.message || `Error: ${response.status}`);
       }
       
-      const evaluationData = await response.json();
+      const { jobId, message } = await response.json();
       
-      // Validate that the response has the expected structure
-      if (!evaluationData.staffName || !evaluationData.criteriaScores) {
-        throw new Error('The evaluation data returned does not have the expected format');
+      if (!jobId) {
+        throw new Error('No job ID received');
       }
       
-      onAnalysisComplete(evaluationData);
+      // Show toast notification
+      toast.success('Analysis started! This may take a minute...');
+      
+      // Poll for job status
+      let completed = false;
+      let result = null;
+      
+      while (!completed) {
+        // Wait 3 seconds between polls
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        
+        const statusResponse = await fetch(`/.netlify/functions/check-job-status?jobId=${jobId}`, {
+          method: 'GET'
+        });
+        
+        if (!statusResponse.ok) {
+          throw new Error(`Error checking status: ${statusResponse.status}`);
+        }
+        
+        const job = await statusResponse.json();
+        
+        if (job.status === 'completed') {
+          completed = true;
+          result = job.result;
+        } else if (job.status === 'failed') {
+          throw new Error(job.error || 'Analysis failed');
+        }
+        
+        // If still processing, continue polling
+      }
+      
+      // Validate the evaluation data structure
+      const validationResult = validateEvaluationData(result);
+      if (!validationResult.isValid) {
+        console.warn('Validation issues found:', validationResult.errors);
+        toast.error('The evaluation data has some issues, but we\'ll try to use it anyway');
+      }
+      
+      // Use the validated data
+      onAnalysisComplete(validationResult.data);
       toast.success('Conversation analyzed successfully!');
       
       // Reset the form

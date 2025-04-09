@@ -11,6 +11,8 @@ export interface JobStatus {
   createdAt: number;
   updatedAt: number;
   expiresAt?: number; // Optional expiration timestamp
+  markdown?: string; // The markdown content to analyze
+  fileName?: string; // The name of the file being analyzed
 }
 
 // Storage provider interface

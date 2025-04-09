@@ -129,11 +129,7 @@ export function validateAndRepairCriteriaScore(score: any, index: number): Crite
 }
 
 // Main validation function
-export function validateEvaluationData(
-  data: any, 
-  markdown?: string, 
-  fileName?: string
-): ValidationResult {
+export function validateEvaluationData(data: any): ValidationResult {
   const errors: ValidationError[] = [];
   const result: EvaluationData = {
     staffName: "Unknown Staff",
@@ -147,12 +143,88 @@ export function validateEvaluationData(
     keyRecommendations: [...DEFAULT_ARRAY_VALUES.keyRecommendations]
   };
 
+  // Check required fields
+  const requiredFields = [
+    'staffName',
+    'date',
+    'overallScore',
+    'performanceLevel',
+    'criteriaScores',
+    'strengths',
+    'areasForImprovement',
+    'keyRecommendations'
+  ];
+
+  for (const field of requiredFields) {
+    if (!(field in data)) {
+      errors.push({ field, message: `Missing required field: ${field}` });
+      result.isValid = false;
+    }
+  }
+
+  // Validate criteriaScores array
+  if (Array.isArray(data.criteriaScores)) {
+    if (data.criteriaScores.length !== 10) {
+      errors.push({ field: 'criteriaScores', message: 'criteriaScores must contain exactly 10 criteria' });
+      result.isValid = false;
+    }
+
+    // Validate each criteria score
+    data.criteriaScores.forEach((score: any, index: number) => {
+      const requiredScoreFields = ['criterion', 'weight', 'score', 'weightedScore', 'notes'];
+      for (const field of requiredScoreFields) {
+        if (!(field in score)) {
+          errors.push({ field: `criteriaScores.${index + 1}`, message: `Missing ${field} in criteria score ${index + 1}` });
+          result.isValid = false;
+        }
+      }
+
+      // Validate score range
+      if (score.score < 1 || score.score > 5) {
+        errors.push({ field: `criteriaScores.${index + 1}.score`, message: `Score for ${score.criterion} must be between 1 and 5` });
+        result.isValid = false;
+      }
+    });
+  } else {
+    errors.push({ field: 'criteriaScores', message: 'criteriaScores must be an array' });
+    result.isValid = false;
+  }
+
+  // Validate arrays have correct length
+  if (!Array.isArray(data.strengths) || data.strengths.length !== 3) {
+    errors.push({ field: 'strengths', message: 'strengths must be an array with exactly 3 items' });
+    result.isValid = false;
+  }
+
+  if (!Array.isArray(data.areasForImprovement) || data.areasForImprovement.length !== 3) {
+    errors.push({ field: 'areasForImprovement', message: 'areasForImprovement must be an array with exactly 3 items' });
+    result.isValid = false;
+  }
+
+  if (!Array.isArray(data.keyRecommendations) || data.keyRecommendations.length !== 3) {
+    errors.push({ field: 'keyRecommendations', message: 'keyRecommendations must be an array with exactly 3 items' });
+    result.isValid = false;
+  }
+
+  // Validate score ranges
+  if (typeof data.overallScore !== 'number' || data.overallScore < 0 || data.overallScore > 100) {
+    errors.push({ field: 'overallScore', message: 'overallScore must be a number between 0 and 100' });
+    result.isValid = false;
+  }
+
+  // Validate performance level
+  const validPerformanceLevels = ['Exceptional', 'Strong', 'Proficient', 'Developing', 'Needs Improvement'];
+  if (!validPerformanceLevels.includes(data.performanceLevel)) {
+    errors.push({ field: 'performanceLevel', message: `performanceLevel must be one of: ${validPerformanceLevels.join(', ')}` });
+    result.isValid = false;
+  }
+
   // Try to extract staff name from markdown or filename if missing
   if (!data?.staffName) {
-    if (markdown) {
-      result.staffName = extractStaffNameFromMarkdown(markdown);
-    } else if (fileName) {
-      result.staffName = extractStaffNameFromFilename(fileName);
+    if (data?.markdown) {
+      result.staffName = extractStaffNameFromMarkdown(data.markdown);
+    } else if (data?.fileName) {
+      result.staffName = extractStaffNameFromFilename(data.fileName);
     }
     errors.push({ field: 'staffName', message: 'Staff name was missing and had to be extracted' });
   } else {
@@ -161,8 +233,8 @@ export function validateEvaluationData(
 
   // Try to extract date from markdown if missing
   if (!data?.date) {
-    if (markdown) {
-      result.date = extractDateFromMarkdown(markdown);
+    if (data?.markdown) {
+      result.date = extractDateFromMarkdown(data.markdown);
     }
     errors.push({ field: 'date', message: 'Date was missing and had to be extracted' });
   } else {
@@ -274,9 +346,7 @@ export function validateEvaluationData(
     }
   });
 
-  return {
-    isValid: errors.length === 0,
-    errors,
-    data: result
-  };
+  result.isValid = errors.length === 0;
+  result.errors = errors;
+  return result;
 } 
