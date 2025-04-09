@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import type { WineEvaluation } from '@/types/evaluation';
+import { validateEvaluationData } from '@/types/evaluation';
 import LoadingIndicator from './LoadingIndicator';
 
 interface MarkdownImporterProps {
@@ -33,9 +34,6 @@ const MarkdownImporter: React.FC<MarkdownImporterProps> = ({
     setLocalAnalyzing(true);
     setIsAnalyzing(true);
     setError(null);
-
-    // Add a small delay to ensure the loading state is visible
-    await new Promise(resolve => setTimeout(resolve, 100));
 
     try {
       // Read the file content
@@ -77,13 +75,10 @@ const MarkdownImporter: React.FC<MarkdownImporterProps> = ({
 
       const data = await response.json();
       
-      // Validate the data structure
-      if (!data.staffName || !data.date || !data.totalScore || !data.criteriaScores) {
-        throw new Error('Invalid evaluation data structure');
+      // Validate the data structure using the proper validation function
+      if (!validateEvaluationData(data)) {
+        throw new Error('Invalid evaluation data structure received from API');
       }
-      
-      // Add a small delay to ensure the loading state is visible
-      await new Promise(resolve => setTimeout(resolve, 500));
       
       // Pass the data to the parent component
       onEvaluationData(data);
@@ -91,13 +86,13 @@ const MarkdownImporter: React.FC<MarkdownImporterProps> = ({
       console.error('Error analyzing conversation:', err);
       setError(err instanceof Error ? err.message : 'An error occurred while analyzing the file');
     } finally {
-      // Add a small delay to ensure the loading state is visible
-      await new Promise(resolve => setTimeout(resolve, 500));
       setLocalAnalyzing(false);
       setIsAnalyzing(false);
-      setFileName(null);
+      if (!error) {
+        setFileName(null);
+      }
     }
-  }, [onEvaluationData, setIsAnalyzing]);
+  }, [onEvaluationData, setIsAnalyzing, error]);
 
   const handleButtonClick = () => {
     fileInputRef.current?.click();

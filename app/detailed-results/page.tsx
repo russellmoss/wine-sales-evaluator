@@ -31,6 +31,21 @@ const PDFExport = dynamic(() => import('@/components/PDFExport'), {
   ),
 });
 
+const BackButton = () => {
+  const router = useRouter();
+  return (
+    <button
+      onClick={() => router.push('/')}
+      className="mb-6 px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors flex items-center"
+    >
+      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+      </svg>
+      Back to Dashboard
+    </button>
+  );
+};
+
 export default function DetailedResultsPage() {
   const router = useRouter();
   const [evaluationData, setEvaluationData] = useState<EvaluationData | null>(null);
@@ -222,268 +237,268 @@ export default function DetailedResultsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Detailed Evaluation Results</h1>
-          <button
-            onClick={() => router.push('/')}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-          >
-            Return to Dashboard
-          </button>
-        </div>
+    <div className="container mx-auto px-4 py-8">
+      <BackButton />
+      
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-3xl font-bold text-gray-900">
+          Evaluation Results for {evaluationData.staffName}
+        </h1>
+        <button
+          onClick={handleExportClick}
+          className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors flex items-center"
+        >
+          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          Export PDF
+        </button>
+      </div>
 
-        {/* Export Report Button */}
-        <div className="max-w-4xl mx-auto mb-4 flex justify-end">
-          <button
-            onClick={handleExportClick}
-            className="bg-green-500 hover:bg-green-600 text-white font-medium py-2 px-4 rounded-md transition-colors flex items-center"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
-            </svg>
-            Export Report
-          </button>
-        </div>
-
-        {/* Summary Card */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-700">Staff Member</h2>
-              <p className="text-gray-900">{evaluationData.staffName}</p>
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold text-gray-700">Date</h2>
-              <p className="text-gray-900">{evaluationData.date}</p>
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold text-gray-700">Performance Level</h2>
-              <p className={`font-semibold ${getPerformanceLevelColor(evaluationData.performanceLevel)}`}>
-                {evaluationData.performanceLevel}
-              </p>
-            </div>
+      {/* Summary Card */}
+      <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-700">Staff Member</h2>
+            <p className="text-gray-900">{evaluationData.staffName}</p>
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold text-gray-700">Date</h2>
+            <p className="text-gray-900">{evaluationData.date}</p>
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold text-gray-700">Performance Level</h2>
+            <p className={`font-semibold ${getPerformanceLevelColor(evaluationData.performanceLevel)}`}>
+              {evaluationData.performanceLevel}
+            </p>
           </div>
         </div>
+      </div>
 
-        {/* Overall Score */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Overall Score</h2>
-          <div className="relative pt-1">
-            <div className="flex mb-2 items-center justify-between">
-              <div>
-                <span className="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-blue-600 bg-blue-200">
-                  {evaluationData.totalScore > 100 
-                    ? Math.round((evaluationData.totalScore / 500) * 100).toFixed(1) 
-                    : evaluationData.totalScore.toFixed(1)}%
-                </span>
-              </div>
+      {/* Overall Score */}
+      <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Overall Score</h2>
+        <div className="relative pt-1">
+          <div className="flex mb-2 items-center justify-between">
+            <div>
+              <span className="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-blue-600 bg-blue-200">
+                {evaluationData.totalScore > 100 
+                  ? Math.round((evaluationData.totalScore / 500) * 100).toFixed(1) 
+                  : evaluationData.totalScore.toFixed(1)}%
+              </span>
             </div>
-            <div className="overflow-hidden h-2 mb-4 text-xs flex rounded bg-blue-200">
-              <div
-                style={{ width: `${evaluationData.totalScore > 100 
-                  ? Math.round((evaluationData.totalScore / 500) * 100) 
-                  : evaluationData.totalScore}%` }}
-                className={`shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center ${getScoreColor(evaluationData.totalScore > 100 
-                  ? Math.round((evaluationData.totalScore / 500) * 100) / 20 
-                  : evaluationData.totalScore / 20)}`}
+          </div>
+          <div className="overflow-hidden h-2 mb-4 text-xs flex rounded bg-blue-200">
+            <div
+              style={{ width: `${evaluationData.totalScore > 100 
+                ? Math.round((evaluationData.totalScore / 500) * 100) 
+                : evaluationData.totalScore}%` }}
+              className={`shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center ${getScoreColor(evaluationData.totalScore > 100 
+                ? Math.round((evaluationData.totalScore / 500) * 100) / 20 
+                : evaluationData.totalScore / 20)}`}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Criteria Scores Bar Chart */}
+      <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Criteria Scores Overview</h2>
+        
+        {/* Bar Chart using Recharts */}
+        <div className="h-80">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart
+              data={evaluationData.criteriaScores.map(criterion => ({
+                name: criterion.criterion.split(' ')[0], // Use first word for brevity
+                score: criterion.score,
+                fullName: criterion.criterion,
+                weight: criterion.weight,
+                notes: criterion.notes
+              }))}
+              margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis 
+                dataKey="name" 
+                angle={-45} 
+                textAnchor="end" 
+                height={60}
+                tick={{ fontSize: 12 }}
               />
-            </div>
-          </div>
-        </div>
-
-        {/* Criteria Scores Bar Chart */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Criteria Scores Overview</h2>
-          
-          {/* Bar Chart using Recharts */}
-          <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={evaluationData.criteriaScores.map(criterion => ({
-                  name: criterion.criterion.split(' ')[0], // Use first word for brevity
-                  score: criterion.score,
-                  fullName: criterion.criterion,
-                  weight: criterion.weight,
-                  notes: criterion.notes
-                }))}
-                margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+              <YAxis 
+                domain={[0, 5]} 
+                ticks={[0, 1, 2, 3, 4, 5]}
+                label={{ value: 'Score', angle: -90, position: 'insideLeft' }}
+              />
+              <Tooltip 
+                content={({ active, payload }) => {
+                  if (active && payload && payload.length) {
+                    const data = payload[0].payload;
+                    return (
+                      <div className="bg-gray-800 text-white p-3 rounded shadow-lg">
+                        <p className="font-bold">{data.fullName}</p>
+                        <p>Score: {data.score}/5</p>
+                        <p>Weight: {data.weight}%</p>
+                        <p className="mt-1 text-gray-300 truncate max-w-xs">
+                          {data.notes.substring(0, 100)}...
+                        </p>
+                      </div>
+                    );
+                  }
+                  return null;
+                }}
+              />
+              <Bar 
+                dataKey="score" 
+                name="Score"
+                animationDuration={1000}
+                animationBegin={0}
               >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis 
-                  dataKey="name" 
-                  angle={-45} 
-                  textAnchor="end" 
-                  height={60}
-                  tick={{ fontSize: 12 }}
-                />
-                <YAxis 
-                  domain={[0, 5]} 
-                  ticks={[0, 1, 2, 3, 4, 5]}
-                  label={{ value: 'Score', angle: -90, position: 'insideLeft' }}
-                />
-                <Tooltip 
-                  content={({ active, payload }) => {
-                    if (active && payload && payload.length) {
-                      const data = payload[0].payload;
-                      return (
-                        <div className="bg-gray-800 text-white p-3 rounded shadow-lg">
-                          <p className="font-bold">{data.fullName}</p>
-                          <p>Score: {data.score}/5</p>
-                          <p>Weight: {data.weight}%</p>
-                          <p className="mt-1 text-gray-300 truncate max-w-xs">
-                            {data.notes.substring(0, 100)}...
-                          </p>
-                        </div>
-                      );
-                    }
-                    return null;
-                  }}
-                />
-                <Bar 
-                  dataKey="score" 
-                  name="Score"
-                  animationDuration={1000}
-                  animationBegin={0}
-                >
-                  {evaluationData.criteriaScores.map((entry, index) => (
-                    <Cell 
-                      key={`cell-${index}`} 
-                      fill={getScoreColor(entry.score)} 
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+                {evaluationData.criteriaScores.map((entry, index) => (
+                  <Cell 
+                    key={`cell-${index}`} 
+                    fill={getScoreColor(entry.score)} 
+                  />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+        
+        {/* Legend */}
+        <div className="flex justify-center mt-6 space-x-4">
+          <div className="flex items-center">
+            <div className="w-4 h-4 bg-green-500 rounded mr-1"></div>
+            <span className="text-xs">Good (4-5)</span>
           </div>
-          
-          {/* Legend */}
-          <div className="flex justify-center mt-6 space-x-4">
-            <div className="flex items-center">
-              <div className="w-4 h-4 bg-green-500 rounded mr-1"></div>
-              <span className="text-xs">Good (4-5)</span>
-            </div>
-            <div className="flex items-center">
-              <div className="w-4 h-4 bg-yellow-500 rounded mr-1"></div>
-              <span className="text-xs">Average (3)</span>
-            </div>
-            <div className="flex items-center">
-              <div className="w-4 h-4 bg-red-500 rounded mr-1"></div>
-              <span className="text-xs">Needs Improvement (1-2)</span>
-            </div>
+          <div className="flex items-center">
+            <div className="w-4 h-4 bg-yellow-500 rounded mr-1"></div>
+            <span className="text-xs">Average (3)</span>
+          </div>
+          <div className="flex items-center">
+            <div className="w-4 h-4 bg-red-500 rounded mr-1"></div>
+            <span className="text-xs">Needs Improvement (1-2)</span>
           </div>
         </div>
+      </div>
 
-        {/* Detailed Criteria Scores */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Detailed Criteria Analysis</h2>
-          <div className="space-y-6">
-            {evaluationData.criteriaScores.map((criterion, index) => (
-              <div key={index} className="border-b border-gray-200 pb-6 last:border-b-0">
-                <div 
-                  className="flex justify-between items-center cursor-pointer"
-                  onClick={() => setExpandedCriterion(expandedCriterion === criterion.criterion ? null : criterion.criterion)}
-                >
-                  <div className="flex-1">
-                    <h3 className="text-lg font-medium text-gray-900">{criterion.criterion}</h3>
-                    <p className="text-sm text-gray-500">Weight: {criterion.weight}%</p>
-                  </div>
-                  <div className="flex items-center space-x-4">
-                    <span className="text-lg font-semibold text-gray-900">
-                      {criterion.score}/5
-                    </span>
-                    <span className="text-sm text-gray-500">
-                      ({criterion.weightedScore} points)
-                    </span>
-                    <svg 
-                      className={`w-5 h-5 ml-2 transition-transform ${expandedCriterion === criterion.criterion ? 'rotate-180' : ''}`} 
-                      fill="none" 
-                      stroke="currentColor" 
-                      viewBox="0 0 24 24" 
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
-                    </svg>
+      {/* Detailed Criteria Scores */}
+      <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Detailed Criteria Analysis</h2>
+        <div className="space-y-6">
+          {evaluationData.criteriaScores.map((criterion, index) => (
+            <div key={index} className="border-b border-gray-200 pb-6 last:border-b-0">
+              <div 
+                className="flex justify-between items-center cursor-pointer"
+                onClick={() => setExpandedCriterion(expandedCriterion === criterion.criterion ? null : criterion.criterion)}
+              >
+                <div className="flex-1">
+                  <h3 className="text-lg font-medium text-gray-900">{criterion.criterion}</h3>
+                  <p className="text-sm text-gray-500">Weight: {criterion.weight}%</p>
+                </div>
+                <div className="flex items-center space-x-4">
+                  <span className="text-lg font-semibold text-gray-900">
+                    {criterion.score}/5
+                  </span>
+                  <span className="text-sm text-gray-500">
+                    ({criterion.weightedScore} points)
+                  </span>
+                  <svg 
+                    className={`w-5 h-5 ml-2 transition-transform ${expandedCriterion === criterion.criterion ? 'rotate-180' : ''}`} 
+                    fill="none" 
+                    stroke="currentColor" 
+                    viewBox="0 0 24 24" 
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                  </svg>
+                </div>
+              </div>
+
+              {expandedCriterion === criterion.criterion && (
+                <div className="mt-4 pl-4 border-l-4 border-blue-200">
+                  <div className="prose max-w-none">
+                    <h4 className="text-md font-semibold text-gray-900 mb-2">Evaluation Notes</h4>
+                    <p className="text-gray-700 mb-4">{criterion.notes}</p>
+
+                    {extractExample(criterion.notes) && (
+                      <div className="bg-gray-50 p-4 rounded-md mb-4">
+                        <h4 className="text-md font-semibold text-gray-900 mb-2">Specific Example</h4>
+                        <blockquote className="text-gray-700 italic border-l-4 border-blue-300 pl-4">
+                          "{extractExample(criterion.notes)}"
+                        </blockquote>
+                      </div>
+                    )}
+
+                    {criterion.score < 4 && (
+                      <div className="bg-yellow-50 p-4 rounded-md">
+                        <h4 className="text-md font-semibold text-gray-900 mb-2">Areas for Improvement</h4>
+                        <ul className="list-disc pl-4 space-y-2">
+                          {extractSuggestions(criterion.notes).length > 0 ? (
+                            extractSuggestions(criterion.notes).map((suggestion, idx) => (
+                              <li key={idx} className="text-gray-700">{suggestion}</li>
+                            ))
+                          ) : (
+                            <li className="text-gray-700">Review the evaluation notes for specific improvement areas.</li>
+                          )}
+                        </ul>
+                      </div>
+                    )}
                   </div>
                 </div>
-
-                {expandedCriterion === criterion.criterion && (
-                  <div className="mt-4 pl-4 border-l-4 border-blue-200">
-                    <div className="prose max-w-none">
-                      <h4 className="text-md font-semibold text-gray-900 mb-2">Evaluation Notes</h4>
-                      <p className="text-gray-700 mb-4">{criterion.notes}</p>
-
-                      {extractExample(criterion.notes) && (
-                        <div className="bg-gray-50 p-4 rounded-md mb-4">
-                          <h4 className="text-md font-semibold text-gray-900 mb-2">Specific Example</h4>
-                          <blockquote className="text-gray-700 italic border-l-4 border-blue-300 pl-4">
-                            "{extractExample(criterion.notes)}"
-                          </blockquote>
-                        </div>
-                      )}
-
-                      {criterion.score < 4 && (
-                        <div className="bg-yellow-50 p-4 rounded-md">
-                          <h4 className="text-md font-semibold text-gray-900 mb-2">Areas for Improvement</h4>
-                          <ul className="list-disc pl-4 space-y-2">
-                            {extractSuggestions(criterion.notes).length > 0 ? (
-                              extractSuggestions(criterion.notes).map((suggestion, idx) => (
-                                <li key={idx} className="text-gray-700">{suggestion}</li>
-                              ))
-                            ) : (
-                              <li className="text-gray-700">Review the evaluation notes for specific improvement areas.</li>
-                            )}
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Strengths */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Key Strengths</h2>
-          <ul className="list-disc pl-4 space-y-2">
-            {evaluationData.strengths.map((strength, index) => (
-              <li key={index} className="text-gray-700">{strength}</li>
-            ))}
-          </ul>
-        </div>
-
-        {/* Areas for Improvement */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Areas for Improvement</h2>
-          <ul className="list-disc pl-4 space-y-2">
-            {evaluationData.areasForImprovement.map((area, index) => (
-              <li key={index} className="text-gray-700">{area}</li>
-            ))}
-          </ul>
-        </div>
-
-        {/* Key Recommendations */}
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Key Recommendations</h2>
-          <ul className="list-disc pl-4 space-y-2">
-            {evaluationData.keyRecommendations.map((recommendation, index) => (
-              <li key={index} className="text-gray-700">{recommendation}</li>
-            ))}
-          </ul>
-        </div>
-
-        {/* PDF Export Modal */}
-        {showPDFExport && evaluationData && evaluationData.staffName && evaluationData.criteriaScores && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-            <div className="bg-white p-4 rounded-lg shadow-xl">
-              <PDFExport evaluationData={evaluationData} onClose={handleClosePDF} />
+              )}
             </div>
-          </div>
-        )}
+          ))}
+        </div>
       </div>
+
+      {/* Strengths */}
+      <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Key Strengths</h2>
+        <ul className="list-disc pl-4 space-y-2">
+          {evaluationData.strengths.map((strength, index) => (
+            <li key={index} className="text-gray-700">{strength}</li>
+          ))}
+        </ul>
+      </div>
+
+      {/* Areas for Improvement */}
+      <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Areas for Improvement</h2>
+        <ul className="list-disc pl-4 space-y-2">
+          {evaluationData.areasForImprovement.map((area, index) => (
+            <li key={index} className="text-gray-700">{area}</li>
+          ))}
+        </ul>
+      </div>
+
+      {/* Key Recommendations */}
+      <div className="bg-white rounded-lg shadow-md p-6">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Key Recommendations</h2>
+        <ul className="list-disc pl-4 space-y-2">
+          {evaluationData.keyRecommendations.map((recommendation, index) => (
+            <li key={index} className="text-gray-700">{recommendation}</li>
+          ))}
+        </ul>
+      </div>
+
+      {/* PDF Export Modal */}
+      {showPDFExport && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-4 w-full max-w-4xl h-[90vh] relative">
+            <button
+              onClick={handleClosePDF}
+              className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <PDFExport evaluationData={evaluationData} onClose={handleClosePDF} />
+          </div>
+        </div>
+      )}
     </div>
   );
 } 

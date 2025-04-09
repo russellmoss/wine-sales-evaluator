@@ -2,30 +2,36 @@
 
 import React, { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import type { WineEvaluation, CriterionScore } from '@/types/evaluation';
+import type { WineEvaluation } from '@/types/evaluation';
 import MarkdownImporter from '@/components/MarkdownImporter';
 import LoadingIndicator from '@/components/LoadingIndicator';
-import PDFExport from '@/components/PDFExport';
 
 const WineEvaluationDashboard: React.FC = () => {
   const router = useRouter();
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showPDFExport, setShowPDFExport] = useState(false);
   const [evaluationData, setEvaluationData] = useState<WineEvaluation | null>(null);
 
-  const handleAnalysisComplete = useCallback((data: WineEvaluation) => {
-    // Set the evaluation data
-    setEvaluationData(data);
-    
-    // Store the data in localStorage with the correct key
-    localStorage.setItem('wineEvaluationData', JSON.stringify(data));
-    
-    // Add a delay to ensure the data is fully processed
-    setTimeout(() => {
+  const handleAnalysisComplete = useCallback(async (data: WineEvaluation) => {
+    try {
+      // Set the evaluation data
+      setEvaluationData(data);
+      
+      // Store the data in localStorage
+      localStorage.setItem('wineEvaluationData', JSON.stringify(data));
+      
+      // Verify the data was stored correctly
+      const storedData = localStorage.getItem('wineEvaluationData');
+      if (!storedData) {
+        throw new Error('Failed to store evaluation data');
+      }
+      
       // Navigate to the detailed results page
       router.push('/detailed-results');
-    }, 1000);
+    } catch (err) {
+      console.error('Error handling analysis completion:', err);
+      setError(err instanceof Error ? err.message : 'Failed to process evaluation data');
+    }
   }, [router]);
 
   return (
@@ -60,28 +66,6 @@ const WineEvaluationDashboard: React.FC = () => {
             </div>
           )}
         </div>
-
-        {evaluationData && (
-          <div className="mt-8 flex justify-center">
-            <button
-              onClick={() => setShowPDFExport(true)}
-              className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-            >
-              Export as PDF
-            </button>
-          </div>
-        )}
-
-        {showPDFExport && evaluationData && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-4 w-full max-w-4xl h-[90vh]">
-              <PDFExport
-                evaluationData={evaluationData}
-                onClose={() => setShowPDFExport(false)}
-              />
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
