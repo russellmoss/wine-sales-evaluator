@@ -498,7 +498,7 @@ export const handler: Handler = async (event: HandlerEvent, context: HandlerCont
       };
     }
 
-    // Get the storage provider
+    // Get the KV storage provider
     const storage = getStorageProvider();
 
     // Create a new job
@@ -509,7 +509,7 @@ export const handler: Handler = async (event: HandlerEvent, context: HandlerCont
     job.createdAt = Date.now();
     job.updatedAt = Date.now();
     
-    // Save the job first and verify it was saved
+    // Save the job to KV store
     await storage.saveJob(job);
     
     // Verify the job was saved by trying to retrieve it
@@ -527,13 +527,14 @@ export const handler: Handler = async (event: HandlerEvent, context: HandlerCont
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        job: job,
+        jobId: job.id,
         markdown,
         fileName
       })
     });
 
     if (!response.ok) {
+      console.error(`Background function returned ${response.status}`);
       throw new Error(`Background function returned ${response.status}`);
     }
 
@@ -549,7 +550,10 @@ export const handler: Handler = async (event: HandlerEvent, context: HandlerCont
     console.error('Main function: Error processing request:', error);
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: 'Internal server error' })
+      body: JSON.stringify({ 
+        error: 'Internal server error',
+        message: error instanceof Error ? error.message : 'Unknown error'
+      })
     };
   }
 }; 
