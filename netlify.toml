@@ -9,9 +9,8 @@
   NODE_ENV = "production"
   DEBUG = "*"
   NPM_FLAGS = "--legacy-peer-deps"
-  CLAUDE_API_KEY = ""
 
-[[plugins]]
+[plugins]
   package = "@netlify/plugin-nextjs"
 
 [functions]

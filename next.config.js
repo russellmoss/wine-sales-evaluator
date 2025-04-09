@@ -6,7 +6,7 @@ const nextConfig = {
     unoptimized: true,
   },
   // Ensure all dependencies are properly handled
-  transpilePackages: ['@react-pdf/renderer', 'recharts'],
+  transpilePackages: ['@react-pdf/renderer', 'recharts', '@netlify/functions'],
   // Disable webpack optimization for static export
   webpack: (config, { isServer }) => {
     // Add specific configuration for @react-pdf/renderer
