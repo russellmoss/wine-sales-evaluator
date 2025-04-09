@@ -49,102 +49,221 @@ const anthropic = new Anthropic({
   apiKey: process.env.CLAUDE_API_KEY,
 });
 
-// Embedded rubric content
-const EMBEDDED_RUBRIC = `## Evaluation Criteria
+// Embedded rubric and example evaluation
+const EMBEDDED_RUBRIC = `# Wine Sales Performance Rubric
 
-### 1. Product Knowledge (30%)
-- Demonstrates comprehensive knowledge of wine characteristics, regions, and varietals
-- Accurately describes wine features, tasting notes, and food pairings
-- Understands wine production methods and quality factors
-- Can explain technical aspects in customer-friendly terms
+## Overview
+This rubric is designed to evaluate the performance of winery tasting room staff members during guest interactions. Each criterion is scored on a scale of 1-5, with specific guidelines for each score level.
 
-### 2. Customer Interaction (25%)
-- Establishes rapport and builds trust with customers
-- Uses active listening and asks relevant questions
-- Adapts communication style to customer preferences
-- Maintains professional and friendly demeanor
+## Evaluation Criteria
 
-### 3. Sales Techniques (25%)
-- Identifies customer needs and preferences effectively
-- Makes appropriate product recommendations
-- Handles objections professionally
-- Closes sales naturally and effectively
+### 1. Initial Greeting and Welcome (Weight: 8%)
+*How effectively does the staff member welcome guests and set a positive tone?*
 
-### 4. Service Excellence (20%)
-- Provides personalized attention and assistance
-- Follows up on customer satisfaction
-- Maintains organized and attractive display areas
-- Demonstrates efficiency in handling transactions
+| Score | Description |
+|-------|-------------|
+| 1 | No greeting or unwelcoming approach |
+| 2 | Basic greeting but minimal warmth |
+| 3 | Friendly greeting but lacks personalization |
+| 4 | Warm, friendly greeting with good eye contact |
+| 5 | Exceptional welcome that makes guests feel valued and excited |
+
+### 2. Building Rapport (Weight: 10%)
+*How well does the staff member connect personally with the guests?*
+
+| Score | Description |
+|-------|-------------|
+| 1 | No attempt to connect personally with guests |
+| 2 | Minimal small talk, mostly transactional |
+| 3 | Some rapport-building questions but limited follow-up |
+| 4 | Good personal connection through meaningful conversation |
+| 5 | Excellent rapport building, including origin questions, future plans, and genuine interest |
+
+### 3. Winery History and Ethos (Weight: 10%)
+*How effectively does the staff member communicate Milea Estate's story and values?*
+
+| Score | Description |
+|-------|-------------|
+| 1 | No mention of winery history or values |
+| 2 | Brief, factual mention of winery background |
+| 3 | Adequate explanation of winery history and values |
+| 4 | Compelling storytelling about winery history, connecting to wines |
+| 5 | Passionate, engaging narrative that brings the winery ethos to life |
+
+### 4. Storytelling and Analogies (Weight: 10%)
+*How well does the staff member use storytelling and analogies to describe wines?*
+
+| Score | Description |
+|-------|-------------|
+| 1 | Technical descriptions only, no storytelling or analogies |
+| 2 | Minimal storytelling, mostly factual information |
+| 3 | Some storytelling elements but lacking rich analogies |
+| 4 | Good use of stories and analogies that help guests understand wines |
+| 5 | Exceptional storytelling that creates memorable experiences and makes wine accessible |
+
+### 5. Recognition of Buying Signals (Weight: 12%)
+*How well does the staff member notice and respond to buying signals?*
+
+| Score | Description |
+|-------|-------------|
+| 1 | Misses obvious buying signals completely |
+| 2 | Notices some signals but response is delayed or inappropriate |
+| 3 | Recognizes main buying signals with adequate response |
+| 4 | Quickly identifies buying signals and responds effectively |
+| 5 | Expertly recognizes subtle cues and capitalizes on buying moments |
+
+### 6. Customer Data Capture (Weight: 8%)
+*How effectively does the staff member attempt to collect customer information?*
+
+| Score | Description |
+|-------|-------------|
+| 1 | No attempt to capture customer data |
+| 2 | Single basic attempt at data collection |
+| 3 | Multiple attempts but without explaining benefits |
+| 4 | Good data capture attempts with clear value proposition |
+| 5 | Natural, non-intrusive data collection that feels beneficial to guest |
+
+### 7. Asking for the Sale (Weight: 12%)
+*How effectively does the staff member ask for wine purchases?*
+
+| Score | Description |
+|-------|-------------|
+| 1 | Never asks for sale or suggests purchase |
+| 2 | Vague suggestion about purchasing without direct ask |
+| 3 | Basic closing attempt but lacks confidence |
+| 4 | Clear, confident ask for purchase at appropriate time |
+| 5 | Multiple strategic closing attempts that feel natural and appropriate |
+
+### 8. Personalized Wine Recommendations (Weight: 10%)
+*How well does the staff member customize wine recommendations based on guest preferences?*
+
+| Score | Description |
+|-------|-------------|
+| 1 | Generic recommendations unrelated to expressed interests |
+| 2 | Basic recommendations with minimal personalization |
+| 3 | Adequate recommendations based on general preferences |
+| 4 | Well-tailored recommendations based on specific guest feedback |
+| 5 | Expertly customized selections that perfectly match expressed interests |
+
+### 9. Wine Club Presentation (Weight: 12%)
+*How effectively does the staff member present and invite guests to join the wine club?*
+
+| Score | Description |
+|-------|-------------|
+| 1 | No mention of wine club or inadequate response when asked |
+| 2 | Basic wine club information without personalization |
+| 3 | Adequate explanation of benefits but minimal customization |
+| 4 | Good presentation of wine club with benefits tailored to guest interests |
+| 5 | Compelling, personalized wine club presentation with clear invitation to join |
+
+### 10. Closing Interaction (Weight: 8%)
+*How well does the staff member conclude the interaction and encourage future visits?*
+
+| Score | Description |
+|-------|-------------|
+| 1 | Abrupt ending with no thanks or future invitation |
+| 2 | Basic thank you but no encouragement to return |
+| 3 | Polite conclusion with general invitation to return |
+| 4 | Warm thank you with specific suggestion for future visit |
+| 5 | Memorable farewell that reinforces relationship and ensures future visits |
+
+## Additional Evaluation Factors
+
+### 11. Product Knowledge (No Weight - Observational Only)
+*How well does the staff member demonstrate knowledge about wines and products?*
+
+| Score | Description |
+|-------|-------------|
+| 1 | Significant gaps in product knowledge |
+| 2 | Basic knowledge but unable to answer deeper questions |
+| 3 | Solid understanding of core products |
+| 4 | Comprehensive knowledge with ability to answer most questions |
+| 5 | Expert knowledge with ability to discuss technical details |
+
+### 12. Handling Objections (No Weight - Observational Only)
+*How effectively does the staff member respond to concerns or objections?*
+
+| Score | Description |
+|-------|-------------|
+| 1 | Avoids or dismisses objections |
+| 2 | Acknowledges objections but provides inadequate responses |
+| 3 | Addresses objections with standard responses |
+| 4 | Effectively addresses objections with personalized solutions |
+| 5 | Masterfully turns objections into opportunities |
 
 ## Scoring Guide
 
+### Calculating the Final Score
+1. For each criterion, assign a score from 1-5
+2. Multiply each score by the criterion's weight
+3. Sum all weighted scores
+4. Divide by the total possible points (500) and multiply by 100 to get a percentage
+
 ### Performance Levels
-- Outstanding (90-100%): Exceptional performance across all criteria
-- Exceeds Expectations (80-89%): Strong performance with minor areas for improvement
-- Meets Expectations (70-79%): Satisfactory performance with clear development areas
-- Below Expectations (60-69%): Performance needs significant improvement
-- Needs Improvement (<60%): Serious performance issues requiring immediate attention
+* **Exceptional**: 90-100%
+* **Strong**: 80-89%
+* **Proficient**: 70-79%
+* **Developing**: 60-69%
+* **Needs Improvement**: Below 60%
 
-### Scoring Breakdown
-- 90-100%: Outstanding performance
-- 80-89%: Exceeds expectations
-- 70-79%: Meets expectations
-- 60-69%: Below expectations
-- Below 60%: Needs improvement`;
+## Feedback Template
 
-// Embedded evaluation example
+\`\`\`
+# Performance Evaluation Summary
+
+## Overall Score: [X]% - [Performance Level]
+
+### Strengths:
+- [Specific positive observation 1]
+- [Specific positive observation 2]
+- [Specific positive observation 3]
+
+### Areas for Improvement:
+- [Specific suggestion 1]
+- [Specific suggestion 2]
+- [Specific suggestion 3]
+
+### Key Recommendations:
+1. [Action-oriented recommendation 1]
+2. [Action-oriented recommendation 2]
+3. [Action-oriented recommendation 3]
+\`\`\``;
+
 const EMBEDDED_EVALUATION_EXAMPLE = {
   "staffName": "John Smith",
   "date": "2024-03-15",
   "overallScore": 85,
-  "performanceLevel": "Exceeds Expectations",
+  "performanceLevel": "Strong",
   "criteriaScores": [
     {
-      "criterion": "Product Knowledge",
-      "weight": 0.30,
-      "score": 90,
-      "weightedScore": 27,
-      "notes": "Demonstrated excellent knowledge of wine regions and varietals. Could improve on technical aspects of wine production."
+      "criterion": "Initial Greeting and Welcome",
+      "weight": 8,
+      "score": 4,
+      "weightedScore": 32,
+      "notes": "Strengths: Warm greeting with immediate eye contact and smile. Areas for Improvement: Could have used customer's name more naturally. Score Rationale: Strong greeting but room for more personalization."
     },
     {
-      "criterion": "Customer Interaction",
-      "weight": 0.25,
-      "score": 85,
-      "weightedScore": 21.25,
-      "notes": "Strong rapport building skills. Active listening needs improvement in some situations."
-    },
-    {
-      "criterion": "Sales Techniques",
-      "weight": 0.25,
-      "score": 80,
-      "weightedScore": 20,
-      "notes": "Good at identifying customer needs. Could work on handling objections more effectively."
-    },
-    {
-      "criterion": "Service Excellence",
-      "weight": 0.20,
-      "score": 85,
-      "weightedScore": 17,
-      "notes": "Consistently provides excellent service. Display areas could be better organized."
+      "criterion": "Wine Knowledge and Recommendations",
+      "weight": 10,
+      "score": 5,
+      "weightedScore": 50,
+      "notes": "Strengths: Excellent knowledge of wine regions and varietals. Areas for Improvement: Could provide more specific food pairing suggestions. Score Rationale: Demonstrated exceptional wine knowledge throughout."
     }
   ],
   "strengths": [
-    "Strong product knowledge",
-    "Excellent rapport building",
-    "Consistent service quality",
-    "Effective needs identification"
+    "Strong wine knowledge and ability to make personalized recommendations",
+    "Excellent customer engagement and active listening skills",
+    "Natural sales approach that doesn't feel pushy"
   ],
   "areasForImprovement": [
-    "Technical wine production knowledge",
-    "Active listening skills",
-    "Objection handling",
-    "Display organization"
+    "Could use customer's name more naturally throughout the conversation",
+    "More specific food pairing suggestions would enhance recommendations",
+    "Follow-up plan could be more detailed"
   ],
   "keyRecommendations": [
-    "Complete advanced wine certification",
-    "Practice active listening techniques",
-    "Attend sales objection handling workshop",
-    "Implement new display organization system"
+    "Practice using customer names more naturally in conversation",
+    "Develop a library of food pairing suggestions for different wines",
+    "Create a structured follow-up plan template"
   ]
 };
 
