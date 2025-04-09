@@ -8,9 +8,8 @@
   NODE_VERSION = "18"
   NODE_ENV = "production"
   NETLIFY = "true"
-  # Job storage configuration
-  JOB_STORAGE_TYPE = "file"
-  JOB_STORAGE_DIR = "/tmp/jobs"
+  # Set storage type to KV
+  JOB_STORAGE_TYPE = "kv"
   JOB_MAX_AGE = "86400000"
   DEBUG = "*"
   NPM_FLAGS = "--legacy-peer-deps"
@@ -20,10 +19,20 @@
 
 [functions]
   node_bundler = "esbuild"
+  external_node_modules = ["@anthropic-ai/sdk", "uuid", "@netlify/blobs"]
 
-[functions.pattern]
-  external_node_modules = ["@anthropic-ai/sdk", "uuid"]
-  timeout = 60
+# Enable Netlify Blobs (KV Store)
+[[edge_functions]]
+  function = "analyze-conversation"
+  path = "/api/analyze-conversation"
+
+[[edge_functions]]
+  function = "check-job-status"
+  path = "/api/check-job-status"
+
+[[edge_functions]]
+  function = "analyze-conversation-background"
+  path = "/api/analyze-conversation-background"
 
 [[redirects]]
   from = "/api/*"

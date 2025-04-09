@@ -1,17 +1,7 @@
-import { Handler, HandlerEvent, HandlerContext } from '@netlify/functions';
-import { getStorageProvider } from '../../app/utils/storage';
+import { Handler, HandlerEvent } from '@netlify/functions';
+import { getStorageProvider, JobStatus } from '../../app/utils/storage';
 
-// Define the job status interface
-interface JobStatus {
-  id: string;
-  status: 'pending' | 'processing' | 'completed' | 'failed';
-  result?: any;
-  error?: string;
-  createdAt: number;
-  updatedAt: number;
-}
-
-export const handler: Handler = async (event: HandlerEvent, context: HandlerContext) => {
+export const handler: Handler = async (event: HandlerEvent) => {
   console.log('Check job status function: Handler started', {
     httpMethod: event.httpMethod,
     pathPattern: event.path,
@@ -38,7 +28,7 @@ export const handler: Handler = async (event: HandlerEvent, context: HandlerCont
   
   console.log(`Checking status for job ID: ${jobId}`);
   
-  // Get the storage provider
+  // Get the KV storage provider
   const storage = getStorageProvider();
   
   try {

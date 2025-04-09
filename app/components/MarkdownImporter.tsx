@@ -16,7 +16,7 @@ const MarkdownImporter: FC<MarkdownImporterProps> = ({ onAnalysisComplete, isAna
   const [fileName, setFileName] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
-  const [evaluationData, setEvaluationData] = useState<EvaluationData | null>(null);
+  const [jobId, setJobId] = useState<string | null>(null);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -32,9 +32,15 @@ const MarkdownImporter: FC<MarkdownImporterProps> = ({ onAnalysisComplete, isAna
   };
 
   const analyzeConversation = async () => {
+    if (!markdown) {
+      toast.error('Please select a markdown file first');
+      return;
+    }
+    
     try {
       setIsAnalyzing(true);
       setError(null);
+      setJobId(null);
 
       // Start the analysis job
       const response = await fetch('/.netlify/functions/analyze-conversation', {
@@ -49,18 +55,28 @@ const MarkdownImporter: FC<MarkdownImporterProps> = ({ onAnalysisComplete, isAna
       });
 
       if (!response.ok) {
-        throw new Error(`Error starting analysis: ${response.status}`);
+        const errorData = await response.json();
+        throw new Error(errorData.message || `Error: ${response.status}`);
       }
 
-      const { jobId } = await response.json();
+      const { jobId, message } = await response.json();
+      
+      if (!jobId) {
+        throw new Error('No job ID received');
+      }
+      
+      // Store job ID for polling
+      setJobId(jobId);
+      
+      // Show toast notification
+      toast.success('Analysis started! This may take a minute...');
 
       // Poll for job status
       let completed = false;
       let result = null;
       let retryCount = 0;
-      let errorCount = 0;
-
-      while (!completed) {
+      
+      while (!completed && retryCount < 20) { // Limit retries to avoid infinite loop
         // Wait 3 seconds between polls
         await new Promise(resolve => setTimeout(resolve, 3000));
         
@@ -69,17 +85,13 @@ const MarkdownImporter: FC<MarkdownImporterProps> = ({ onAnalysisComplete, isAna
             method: 'GET'
           });
           
-          // If the job isn't found (404), retry a few times before giving up
-          if (statusResponse.status === 404) {
-            retryCount = (retryCount || 0) + 1;
-            if (retryCount > 5) {
-              throw new Error('Job not found after multiple retries');
-            }
-            console.log(`Job not found yet, retry ${retryCount}/5`);
-            continue;
-          }
-          
           if (!statusResponse.ok) {
+            // If 404, job not found yet in KV store - retry
+            if (statusResponse.status === 404) {
+              console.log(`Job ${jobId} not found yet, retrying... (${retryCount + 1}/20)`);
+              retryCount++;
+              continue;
+            }
             throw new Error(`Error checking status: ${statusResponse.status}`);
           }
           
@@ -91,37 +103,47 @@ const MarkdownImporter: FC<MarkdownImporterProps> = ({ onAnalysisComplete, isAna
           } else if (job.status === 'failed') {
             throw new Error(job.error || 'Analysis failed');
           } else {
-            console.log(`Current job status: ${job.status}`);
+            console.log(`Job status: ${job.status}`);
+            // Still processing, continue polling
           }
         } catch (error) {
           console.error('Error checking job status:', error);
-          errorCount = (errorCount || 0) + 1;
-          if (errorCount > 3) {
-            throw error;
-          }
+          // If we get repeated errors, increment retry count
+          retryCount++;
         }
       }
-
-      // Validate the evaluation data
-      if (!result || !validateEvaluationData(result)) {
-        throw new Error('Invalid evaluation data received');
+      
+      if (!completed) {
+        throw new Error('Analysis timed out after multiple retries');
       }
-
-      // Update the evaluation data
-      setEvaluationData(result);
-      toast.success('Analysis completed successfully');
-
+      
+      if (!result) {
+        throw new Error('No result returned from analysis');
+      }
+      
+      // Validate the evaluation data structure
+      const validationResult = validateEvaluationData(result);
+      if (!validationResult.isValid) {
+        console.warn('Validation issues found:', validationResult.errors);
+        toast.error('The evaluation data has some issues, but we\'ll try to use it anyway');
+      }
+      
+      // Use the validated data
+      onAnalysisComplete(validationResult.data);
+      toast.success('Conversation analyzed successfully!');
+      
       // Reset the form
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
       setMarkdown(null);
       setFileName('');
+      setJobId(null);
       
     } catch (error) {
       console.error('Error analyzing conversation:', error);
       setError(error instanceof Error ? error.message : 'An error occurred during analysis');
-      toast.error('Failed to analyze conversation');
+      toast.error(error instanceof Error ? error.message : 'Error analyzing conversation. Please try again.');
     } finally {
       setIsAnalyzing(false);
     }
@@ -157,8 +179,24 @@ const MarkdownImporter: FC<MarkdownImporterProps> = ({ onAnalysisComplete, isAna
             : 'bg-blue-600 hover:bg-blue-700'
           }`}
       >
-        {isAnalyzing ? 'Analyzing...' : 'Analyze Conversation'}
+        {isAnalyzing ? (
+          <div className="flex items-center justify-center">
+            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            {jobId ? `Analyzing (Job: ${jobId.substring(0, 8)}...)` : 'Analyzing...'}
+          </div>
+        ) : (
+          'Analyze Conversation'
+        )}
       </button>
+      
+      {error && (
+        <div className="mt-4 p-3 bg-red-100 text-red-700 rounded-md">
+          {error}
+        </div>
+      )}
     </div>
   );
 };

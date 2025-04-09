@@ -131,9 +131,11 @@ export function validateAndRepairCriteriaScore(score: any, index: number): Crite
 // Main validation function
 export function validateEvaluationData(data: any): ValidationResult {
   const errors: ValidationError[] = [];
-  const result: EvaluationData = {
-    staffName: "Unknown Staff",
-    date: new Date().toISOString().split('T')[0],
+  
+  // Create a default valid structure to fall back on
+  const validData: EvaluationData = {
+    staffName: data?.staffName || "Unknown Staff",
+    date: data?.date || new Date().toISOString().split('T')[0],
     overallScore: 0,
     performanceLevel: "Needs Improvement",
     criteriaScores: [],
@@ -142,203 +144,102 @@ export function validateEvaluationData(data: any): ValidationResult {
     areasForImprovement: [...DEFAULT_ARRAY_VALUES.areasForImprovement],
     keyRecommendations: [...DEFAULT_ARRAY_VALUES.keyRecommendations]
   };
-
-  // Check required fields
-  const requiredFields = [
-    'staffName',
-    'date',
-    'overallScore',
-    'performanceLevel',
-    'criteriaScores',
-    'strengths',
-    'areasForImprovement',
-    'keyRecommendations'
-  ];
-
-  for (const field of requiredFields) {
-    if (!(field in data)) {
-      errors.push({ field, message: `Missing required field: ${field}` });
-    }
+  
+  // Check for required fields
+  if (!data) {
+    errors.push({ field: "data", message: "No evaluation data provided" });
+    return { isValid: false, errors, data: validData };
   }
-
-  // Validate criteriaScores array
+  
+  // Validate and copy fields
+  if (data.staffName) {
+    validData.staffName = data.staffName;
+  } else {
+    errors.push({ field: "staffName", message: "Missing staffName" });
+  }
+  
+  if (data.date) {
+    validData.date = data.date;
+  } else {
+    errors.push({ field: "date", message: "Missing date" });
+  }
+  
+  // Handle both overallScore and totalScore
+  if (data.overallScore !== undefined) {
+    validData.overallScore = Number(data.overallScore);
+  } else if (data.totalScore !== undefined) {
+    validData.overallScore = Number(data.totalScore);
+  } else {
+    errors.push({ field: "overallScore", message: "Missing overallScore" });
+  }
+  
+  if (data.performanceLevel) {
+    validData.performanceLevel = data.performanceLevel;
+  } else {
+    errors.push({ field: "performanceLevel", message: "Missing performanceLevel" });
+  }
+  
+  // Validate criteriaScores
   if (Array.isArray(data.criteriaScores)) {
-    if (data.criteriaScores.length !== 10) {
-      errors.push({ field: 'criteriaScores', message: 'criteriaScores must contain exactly 10 criteria' });
-    }
-
-    // Validate each criteria score
-    data.criteriaScores.forEach((score: any, index: number) => {
-      const requiredScoreFields = ['criterion', 'weight', 'score', 'weightedScore', 'notes'];
-      for (const field of requiredScoreFields) {
-        if (!(field in score)) {
-          errors.push({ field: `criteriaScores.${index + 1}`, message: `Missing ${field} in criteria score ${index + 1}` });
-        }
-      }
-
-      // Validate score range
-      if (score.score < 1 || score.score > 5) {
-        errors.push({ field: `criteriaScores.${index + 1}.score`, message: `Score for ${score.criterion} must be between 1 and 5` });
-      }
-    });
+    validData.criteriaScores = data.criteriaScores.map((item: any, index: number) => ({
+      criterion: item.criterion || `Criterion ${index + 1}`,
+      weight: Number(item.weight) || 10,
+      score: Number(item.score) || 3,
+      weightedScore: Number(item.weightedScore) || (Number(item.score) * Number(item.weight)),
+      notes: item.notes || "No notes provided"
+    }));
   } else {
-    errors.push({ field: 'criteriaScores', message: 'criteriaScores must be an array' });
+    errors.push({ field: "criteriaScores", message: "Missing or invalid criteriaScores" });
   }
-
-  // Validate arrays have correct length
-  if (!Array.isArray(data.strengths) || data.strengths.length !== 3) {
-    errors.push({ field: 'strengths', message: 'strengths must be an array with exactly 3 items' });
+  
+  // Validate strengths
+  if (Array.isArray(data.strengths)) {
+    validData.strengths = data.strengths;
+  } else {
+    errors.push({ field: "strengths", message: "Missing or invalid strengths" });
   }
-
-  if (!Array.isArray(data.areasForImprovement) || data.areasForImprovement.length !== 3) {
-    errors.push({ field: 'areasForImprovement', message: 'areasForImprovement must be an array with exactly 3 items' });
+  
+  // Validate areasForImprovement
+  if (Array.isArray(data.areasForImprovement)) {
+    validData.areasForImprovement = data.areasForImprovement;
+  } else {
+    errors.push({ field: "areasForImprovement", message: "Missing or invalid areasForImprovement" });
   }
-
-  if (!Array.isArray(data.keyRecommendations) || data.keyRecommendations.length !== 3) {
-    errors.push({ field: 'keyRecommendations', message: 'keyRecommendations must be an array with exactly 3 items' });
+  
+  // Validate keyRecommendations
+  if (Array.isArray(data.keyRecommendations)) {
+    validData.keyRecommendations = data.keyRecommendations;
+  } else {
+    errors.push({ field: "keyRecommendations", message: "Missing or invalid keyRecommendations" });
   }
-
-  // Validate score ranges
-  if (typeof data.overallScore !== 'number' || data.overallScore < 0 || data.overallScore > 100) {
-    errors.push({ field: 'overallScore', message: 'overallScore must be a number between 0 and 100' });
-  }
-
-  // Validate performance level
-  const validPerformanceLevels = ['Exceptional', 'Strong', 'Proficient', 'Developing', 'Needs Improvement'];
-  if (!validPerformanceLevels.includes(data.performanceLevel)) {
-    errors.push({ field: 'performanceLevel', message: `performanceLevel must be one of: ${validPerformanceLevels.join(', ')}` });
-  }
-
+  
   // Try to extract staff name from markdown or filename if missing
-  if (!data?.staffName) {
+  if (!validData.staffName || validData.staffName === "Unknown Staff") {
     if (data?.markdown) {
-      result.staffName = extractStaffNameFromMarkdown(data.markdown);
+      validData.staffName = extractStaffNameFromMarkdown(data.markdown);
     } else if (data?.fileName) {
-      result.staffName = extractStaffNameFromFilename(data.fileName);
+      validData.staffName = extractStaffNameFromFilename(data.fileName);
     }
-    errors.push({ field: 'staffName', message: 'Staff name was missing and had to be extracted' });
-  } else {
-    result.staffName = data.staffName;
   }
-
+  
   // Try to extract date from markdown if missing
-  if (!data?.date) {
+  if (!validData.date) {
     if (data?.markdown) {
-      result.date = extractDateFromMarkdown(data.markdown);
+      validData.date = extractDateFromMarkdown(data.markdown);
     }
-    errors.push({ field: 'date', message: 'Date was missing and had to be extracted' });
-  } else {
-    result.date = data.date;
   }
-
-  // Handle score fields
-  if (data?.overallScore !== undefined) {
-    result.overallScore = convertToNumber(data.overallScore);
-  } else if (data?.totalScore !== undefined) {
-    result.overallScore = convertToNumber(data.totalScore);
-  }
-
+  
   // Normalize score to percentage
-  result.overallScore = normalizeScoreToPercentage(result.overallScore);
-
-  // Set performance level based on score
-  result.performanceLevel = getPerformanceLevelFromScore(result.overallScore);
-
-  // Handle criteria scores
-  if (Array.isArray(data?.criteriaScores) && data.criteriaScores.length > 0) {
-    result.criteriaScores = data.criteriaScores.map((score: any, index: number) => 
-      validateAndRepairCriteriaScore(score, index)
-    );
+  validData.overallScore = normalizeScoreToPercentage(validData.overallScore);
+  
+  // Set performance level based on score if not already set
+  if (!validData.performanceLevel || validData.performanceLevel === "Needs Improvement") {
+    validData.performanceLevel = getPerformanceLevelFromScore(validData.overallScore);
   }
-
-  // Ensure we have at least 10 criteria scores
-  if (result.criteriaScores.length < 10) {
-    const missingCount = 10 - result.criteriaScores.length;
-    errors.push({ 
-      field: 'criteriaScores', 
-      message: `Missing ${missingCount} criteria scores, adding default values` 
-    });
-
-    // Add missing criteria
-    for (let i = result.criteriaScores.length; i < 10; i++) {
-      const defaultCriterion = DEFAULT_CRITERIA[i - result.criteriaScores.length];
-      result.criteriaScores.push({
-        criterion: defaultCriterion.criterion,
-        weight: defaultCriterion.weight,
-        score: 3,
-        weightedScore: defaultCriterion.weight * 3,
-        notes: "Default criteria added due to missing data"
-      });
-    }
-  } else if (result.criteriaScores.length > 10) {
-    errors.push({ 
-      field: 'criteriaScores', 
-      message: `Too many criteria scores (${result.criteriaScores.length}), truncating to 10` 
-    });
-    result.criteriaScores = result.criteriaScores.slice(0, 10);
-  }
-
-  // Calculate overall score if not set
-  if (result.overallScore === 0 && result.criteriaScores.length > 0) {
-    result.overallScore = calculateTotalScoreFromCriteriaScores(result.criteriaScores);
-    result.performanceLevel = getPerformanceLevelFromScore(result.overallScore);
-    errors.push({ 
-      field: 'overallScore', 
-      message: 'Overall score was missing and had to be calculated from criteria scores' 
-    });
-  }
-
-  // Handle observational notes
-  if (data?.observationalNotes) {
-    result.observationalNotes = {
-      productKnowledge: {
-        score: convertToNumber(data.observationalNotes.productKnowledge?.score) || 3,
-        notes: data.observationalNotes.productKnowledge?.notes || "No notes provided"
-      },
-      handlingObjections: {
-        score: convertToNumber(data.observationalNotes.handlingObjections?.score) || 3,
-        notes: data.observationalNotes.handlingObjections?.notes || "No notes provided"
-      }
-    };
-  }
-
-  // Handle arrays
-  ['strengths', 'areasForImprovement', 'keyRecommendations'].forEach(field => {
-    const arrayField = field as keyof Pick<EvaluationData, 'strengths' | 'areasForImprovement' | 'keyRecommendations'>;
-    if (Array.isArray(data?.[arrayField]) && data[arrayField].length > 0) {
-      result[arrayField] = data[arrayField];
-      
-      // Ensure exactly 3 items
-      if (result[arrayField].length !== 3) {
-        if (result[arrayField].length < 3) {
-          errors.push({ 
-            field, 
-            message: `Missing ${3 - result[arrayField].length} items, adding default values` 
-          });
-          
-          // Add missing items
-          for (let i = result[arrayField].length; i < 3; i++) {
-            result[arrayField].push(DEFAULT_ARRAY_VALUES[arrayField][i - result[arrayField].length]);
-          }
-        } else {
-          errors.push({ 
-            field, 
-            message: `Too many items (${result[arrayField].length}), truncating to 3` 
-          });
-          result[arrayField] = result[arrayField].slice(0, 3);
-        }
-      }
-    } else {
-      errors.push({ 
-        field, 
-        message: `${field} was missing or empty, using default values` 
-      });
-    }
-  });
-
+  
   return {
     isValid: errors.length === 0,
     errors,
-    data: result
+    data: validData
   };
 } 
