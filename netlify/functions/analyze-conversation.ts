@@ -1,4 +1,4 @@
-import { Handler } from '@netlify/functions';
+import { Handler, HandlerEvent, HandlerContext, HandlerResponse } from '@netlify/functions';
 import { Anthropic } from '@anthropic-ai/sdk';
 import fs from 'fs';
 import path from 'path';
@@ -53,28 +53,31 @@ try {
   }
 }
 
-export const handler: Handler = async (event: any) => {
+export const handler: Handler = async (event: HandlerEvent, context: HandlerContext) => {
   console.log('Netlify function: Handler started');
-  console.log(`Netlify function: HTTP method: ${event.httpMethod}`);
+  console.log('Netlify function: HTTP Method:', event.httpMethod);
   
   if (event.httpMethod !== 'POST') {
-    console.log('Netlify function: Method not allowed');
     return {
       statusCode: 405,
-      body: JSON.stringify({ error: 'Method not allowed' }),
+      body: JSON.stringify({ error: 'Method not allowed' })
     };
   }
 
   try {
-    console.log('Netlify function: Parsing request body');
-    const { markdown, fileName } = JSON.parse(event.body || '{}');
-    console.log(`Netlify function: Request parsed, fileName: ${fileName}`);
-    
-    if (!markdown) {
-      console.log('Netlify function: No markdown content provided');
+    if (!event.body) {
       return {
         statusCode: 400,
-        body: JSON.stringify({ error: 'No markdown content provided' }),
+        body: JSON.stringify({ error: 'No request body provided' })
+      };
+    }
+
+    const { markdown, fileName } = JSON.parse(event.body);
+    
+    if (!markdown) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ error: 'No markdown content provided' })
       };
     }
 
@@ -202,24 +205,19 @@ Return ONLY THE JSON with no additional text.`;
     return {
       statusCode: 200,
       body: JSON.stringify(evaluationData),
+      headers: {
+        'Content-Type': 'application/json'
+      }
     };
 
   } catch (error) {
-    console.error('Netlify function: Function error:', error);
-    // Log more details about the error
-    if (error instanceof Error) {
-      console.error('Netlify function: Error details:', {
-        name: error.name,
-        message: error.message,
-        stack: error.stack
-      });
-    }
+    console.error('Netlify function: Error in handler:', error);
     return {
       statusCode: 500,
       body: JSON.stringify({ 
         error: 'Internal server error',
-        message: error instanceof Error ? error.message : 'Unknown error occurred' 
-      }),
+        message: error instanceof Error ? error.message : 'Unknown error occurred'
+      })
     };
   }
 }; 
