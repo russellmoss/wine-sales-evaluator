@@ -4,12 +4,30 @@ const path = require('path');
 const CLAUDE_API_KEY = process.env.CLAUDE_API_KEY;
 const CLAUDE_API_URL = 'https://api.anthropic.com/v1/messages';
 
-// Load the rubric file
-const rubricPath = path.join(process.cwd(), 'public', 'data', 'wines_sales_rubric.md');
-const WINES_SALES_RUBRIC = fs.readFileSync(rubricPath, 'utf8');
+// Load the rubric file - using absolute path for Netlify Functions
+const rubricPath = path.join('/tmp', 'wines_sales_rubric.md');
+const evaluationExamplePath = path.join('/tmp', 'evaluation_new.json');
 
-// Load the example evaluation JSON for structure reference
-const evaluationExamplePath = path.join(process.cwd(), 'public', 'data', 'evaluation_new.json');
+// Ensure the files exist in /tmp
+try {
+  if (!fs.existsSync(rubricPath)) {
+    fs.copyFileSync(
+      path.join(process.cwd(), 'public', 'data', 'wines_sales_rubric.md'),
+      rubricPath
+    );
+  }
+  if (!fs.existsSync(evaluationExamplePath)) {
+    fs.copyFileSync(
+      path.join(process.cwd(), 'public', 'data', 'evaluation_new.json'),
+      evaluationExamplePath
+    );
+  }
+} catch (error) {
+  console.error('Error copying files to /tmp:', error);
+}
+
+// Load the files
+const WINES_SALES_RUBRIC = fs.readFileSync(rubricPath, 'utf8');
 const EVALUATION_EXAMPLE = fs.readFileSync(evaluationExamplePath, 'utf8');
 
 // Add timeout to fetch requests
