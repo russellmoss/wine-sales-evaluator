@@ -27,13 +27,18 @@ export class FileStorageProvider implements StorageProvider {
   private jobsDir: string;
   private maxAge: number; // Maximum age of jobs in milliseconds
 
-  constructor(jobsDir: string, maxAge: number = 24 * 60 * 60 * 1000) { // Default: 24 hours
+  constructor(jobsDir: string, maxAge: number) {
     this.jobsDir = jobsDir;
     this.maxAge = maxAge;
     this.ensureJobsDir();
   }
 
   private ensureJobsDir(): void {
+    // Always use /tmp in Netlify environment
+    if (process.env.NETLIFY === 'true') {
+      this.jobsDir = '/tmp/jobs';
+    }
+    
     try {
       if (!fs.existsSync(this.jobsDir)) {
         console.log(`Creating jobs directory: ${this.jobsDir}`);
@@ -42,17 +47,11 @@ export class FileStorageProvider implements StorageProvider {
     } catch (error) {
       console.error(`Error creating jobs directory: ${this.jobsDir}`, error);
       
-      // In Netlify environment, always use /tmp/jobs
-      if (process.env.NETLIFY === 'true') {
-        console.log('Netlify environment detected, using /tmp/jobs directory');
-        this.jobsDir = '/tmp/jobs';
-        this.ensureJobsDir();
-      } 
-      // If we can't create the directory and not in Netlify, try using /tmp as a fallback
-      else if (this.jobsDir !== '/tmp/jobs') {
+      // If original directory creation failed, always try /tmp/jobs as fallback
+      if (this.jobsDir !== '/tmp/jobs') {
         console.log('Falling back to /tmp/jobs directory');
         this.jobsDir = '/tmp/jobs';
-        this.ensureJobsDir();
+        this.ensureJobsDir(); // Call recursively with new path
       } else {
         throw new Error(`Failed to create jobs directory: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
@@ -254,24 +253,19 @@ export function createStorageProvider(): StorageProvider {
   // Get storage configuration from environment variables
   const storageType = process.env.JOB_STORAGE_TYPE || 'file';
   
-  // Use /tmp directory in Netlify environment, otherwise use the configured directory
-  const isNetlify = process.env.NETLIFY === 'true';
-  const defaultJobsDir = isNetlify ? '/tmp/jobs' : path.join(process.cwd(), 'tmp', 'jobs');
-  const jobsDir = process.env.JOB_STORAGE_DIR || defaultJobsDir;
-  
-  // In Netlify environment, always use /tmp/jobs regardless of configuration
-  const finalJobsDir = isNetlify ? '/tmp/jobs' : jobsDir;
+  // Always use /tmp for Netlify functions since it's the only writable directory
+  const jobsDir = '/tmp/jobs';
   
   const maxAge = parseInt(process.env.JOB_MAX_AGE || '86400000', 10); // Default: 24 hours in milliseconds
   
-  console.log(`Initializing ${storageType} storage provider with directory: ${finalJobsDir}`);
+  console.log(`Initializing ${storageType} storage provider with directory: ${jobsDir}`);
   
   switch (storageType.toLowerCase()) {
     case 'memory':
       return new MemoryStorageProvider(maxAge);
     case 'file':
     default:
-      return new FileStorageProvider(finalJobsDir, maxAge);
+      return new FileStorageProvider(jobsDir, maxAge);
   }
 }
 

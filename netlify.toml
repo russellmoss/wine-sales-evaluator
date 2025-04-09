@@ -7,6 +7,11 @@
   NEXT_TELEMETRY_DISABLED = "1"
   NODE_VERSION = "18"
   NODE_ENV = "production"
+  NETLIFY = "true"
+  # Job storage configuration
+  JOB_STORAGE_TYPE = "file"
+  JOB_STORAGE_DIR = "/tmp/jobs"
+  JOB_MAX_AGE = "86400000"
   DEBUG = "*"
   NPM_FLAGS = "--legacy-peer-deps"
 
@@ -65,4 +70,11 @@
   pretty_urls = true
 
 [build.processing.images]
-  compress = true 
+  compress = true
+
+# Increase timeout for functions that may take longer
+[functions.analyze-conversation]
+  timeout = 30
+
+[functions.analyze-conversation-background]
+  timeout = 60 

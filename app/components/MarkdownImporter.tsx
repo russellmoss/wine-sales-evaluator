@@ -1,21 +1,17 @@
 "use client";
 
-import React, { useState, useRef } from 'react';
+import React, { FC, useRef, useState } from 'react';
 import { toast } from 'react-hot-toast';
 import { validateEvaluationData } from '../utils/validation';
 import { EvaluationData } from '../types/evaluation';
 
 interface MarkdownImporterProps {
-  onAnalysisComplete: (evaluationData: EvaluationData) => void;
+  onAnalysisComplete: (data: EvaluationData) => void;
   isAnalyzing: boolean;
-  setIsAnalyzing: (value: boolean) => void;
+  setIsAnalyzing: (isAnalyzing: boolean) => void;
 }
 
-const MarkdownImporter: React.FC<MarkdownImporterProps> = ({ 
-  onAnalysisComplete,
-  isAnalyzing,
-  setIsAnalyzing
-}) => {
+const MarkdownImporter: FC<MarkdownImporterProps> = ({ onAnalysisComplete, isAnalyzing, setIsAnalyzing }) => {
   const [markdown, setMarkdown] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -23,9 +19,8 @@ const MarkdownImporter: React.FC<MarkdownImporterProps> = ({
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    
+
     setFileName(file.name);
-    
     const reader = new FileReader();
     reader.onload = (e) => {
       const content = e.target?.result as string;
@@ -33,7 +28,7 @@ const MarkdownImporter: React.FC<MarkdownImporterProps> = ({
     };
     reader.readAsText(file);
   };
-  
+
   const analyzeConversation = async () => {
     if (!markdown) {
       toast.error('Please select a markdown file first');
@@ -55,66 +50,97 @@ const MarkdownImporter: React.FC<MarkdownImporterProps> = ({
         }),
       });
       
+      // Get the response text first
+      const responseText = await response.text();
+      
+      // Handle non-OK responses
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || `Error: ${response.status}`);
-      }
-      
-      let responseData = await response.json();
-      
-      // Check if we got a job ID (for async processing)
-      if (responseData.jobId) {
-        toast.success('Analysis started. Waiting for results...');
+        let errorMessage = `Error: ${response.status}`;
         
-        // Poll for job status
-        const jobId = responseData.jobId;
-        let jobCompleted = false;
-        let attempts = 0;
-        const maxAttempts = 60; // 5 minutes at 5 second intervals
-        
-        while (!jobCompleted && attempts < maxAttempts) {
-          attempts++;
-          await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
-          
-          const statusResponse = await fetch(`/api/analyze-conversation?jobId=${jobId}`);
-          if (!statusResponse.ok) {
-            console.error(`Error checking job status: ${statusResponse.status}`);
-            continue;
+        try {
+          // Try to parse the error as JSON
+          const errorData = JSON.parse(responseText);
+          if (errorData.message) {
+            errorMessage = errorData.message;
+          } else if (errorData.error) {
+            errorMessage = errorData.error;
           }
-          
-          const statusData = await statusResponse.json();
-          
-          if (statusData.status === 'completed') {
-            responseData = statusData.result;
-            jobCompleted = true;
-          } else if (statusData.status === 'failed') {
-            throw new Error(statusData.error || 'Job processing failed');
+        } catch (e) {
+          // If the error can't be parsed as JSON, use the raw text
+          if (responseText) {
+            errorMessage = responseText.substring(0, 100); // Limit error message length
           }
-          
-          // Update toast with progress
-          toast.loading(`Analysis in progress (${attempts}/60)...`, {id: 'analysis-progress'});
         }
         
-        if (!jobCompleted) {
-          throw new Error('Analysis timed out. Please try again.');
+        throw new Error(errorMessage);
+      }
+      
+      // Try multiple approaches to extract valid JSON from the response
+      let evaluationData: EvaluationData | null = null;
+      let parseError: Error | null = null;
+      
+      // Approach 1: Direct JSON parse
+      try {
+        evaluationData = JSON.parse(responseText);
+      } catch (e) {
+        parseError = e as Error;
+        console.log('Direct JSON parse failed, trying alternative approaches');
+      }
+      
+      // Approach 2: Look for JSON code blocks
+      if (!evaluationData) {
+        const codeBlockMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+        if (codeBlockMatch) {
+          try {
+            evaluationData = JSON.parse(codeBlockMatch[1].trim());
+            console.log('Successfully extracted JSON from code block');
+          } catch (e) {
+            console.log('Failed to parse JSON from code block');
+          }
         }
       }
       
-      // Log the full structure for debugging
-      console.log('Response data structure:', JSON.stringify(responseData, null, 2));
+      // Approach 3: Look for JSON object with curly braces
+      if (!evaluationData) {
+        const jsonMatch = responseText.match(/(\{[\s\S]*\})/);
+        if (jsonMatch) {
+          try {
+            evaluationData = JSON.parse(jsonMatch[0]);
+            console.log('Successfully extracted JSON from text');
+          } catch (e) {
+            console.log('Failed to parse JSON from text match');
+          }
+        }
+      }
       
-      // Use the shared validation utility
-      const validationResult = validateEvaluationData(responseData, markdown, fileName);
+      // Approach 4: Look for JSON array with square brackets
+      if (!evaluationData) {
+        const arrayMatch = responseText.match(/(\[[\s\S]*\])/);
+        if (arrayMatch) {
+          try {
+            evaluationData = JSON.parse(arrayMatch[0]);
+            console.log('Successfully extracted JSON array from text');
+          } catch (e) {
+            console.log('Failed to parse JSON array from text match');
+          }
+        }
+      }
       
-      // Log validation errors if any
+      // If all approaches failed, throw an error
+      if (!evaluationData) {
+        console.error('All JSON parsing attempts failed:', parseError);
+        console.log('Invalid response text:', responseText.substring(0, 500) + '...');
+        throw new Error('Failed to parse evaluation data from response');
+      }
+      
+      // Validate the evaluation data structure
+      const validationResult = validateEvaluationData(evaluationData);
       if (!validationResult.isValid) {
-        console.warn('Validation errors:', validationResult.errors);
-        
-        // Show a warning toast with the number of validation issues
-        toast.error(`Data had ${validationResult.errors.length} validation issues that were automatically fixed.`);
+        console.warn('Validation issues found:', validationResult.errors);
+        toast.error('The evaluation data has some issues, but we\'ll try to use it anyway');
       }
       
-      // Pass the validated data to the parent component
+      // Use the validated data
       onAnalysisComplete(validationResult.data);
       toast.success('Conversation analyzed successfully!');
       
@@ -132,49 +158,39 @@ const MarkdownImporter: React.FC<MarkdownImporterProps> = ({
       setIsAnalyzing(false);
     }
   };
-  
+
   return (
-    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-      <input
-        type="file"
-        ref={fileInputRef}
-        onChange={handleFileChange}
-        accept=".md,.txt"
-        className="hidden"
-      />
-      <button
-        onClick={() => fileInputRef.current?.click()}
-        className="px-4 py-2 bg-purple-700 text-white rounded hover:bg-purple-600 flex items-center"
-        disabled={isAnalyzing}
-      >
-        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
-        </svg>
-        Import Conversation
-      </button>
+    <div className="w-full max-w-2xl mx-auto p-4">
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Upload Conversation Markdown
+        </label>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".md,.txt"
+          onChange={handleFileChange}
+          className="block w-full text-sm text-gray-500
+            file:mr-4 file:py-2 file:px-4
+            file:rounded-md file:border-0
+            file:text-sm file:font-semibold
+            file:bg-blue-50 file:text-blue-700
+            hover:file:bg-blue-100"
+          disabled={isAnalyzing}
+        />
+      </div>
       
-      {fileName && (
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
-          <span className="text-sm text-gray-600 truncate max-w-xs">{fileName}</span>
-          <button
-            onClick={analyzeConversation}
-            disabled={isAnalyzing}
-            className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-500 flex items-center"
-          >
-            {isAnalyzing ? (
-              <>
-                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Analyzing...
-              </>
-            ) : (
-              <>Analyze with Claude</>
-            )}
-          </button>
-        </div>
-      )}
+      <button
+        onClick={analyzeConversation}
+        disabled={!markdown || isAnalyzing}
+        className={`w-full py-2 px-4 rounded-md text-white font-medium
+          ${!markdown || isAnalyzing
+            ? 'bg-gray-400 cursor-not-allowed'
+            : 'bg-blue-600 hover:bg-blue-700'
+          }`}
+      >
+        {isAnalyzing ? 'Analyzing...' : 'Analyze Conversation'}
+      </button>
     </div>
   );
 };

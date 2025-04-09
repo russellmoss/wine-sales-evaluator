@@ -49,144 +49,126 @@ const anthropic = new Anthropic({
   apiKey: process.env.CLAUDE_API_KEY,
 });
 
-// Extract essential parts from the rubric
-const extractEssentialRubric = (fullRubric: string): string => {
-  // Extract only the criteria sections and scoring guide
-  const criteriaMatch = fullRubric.match(/## Evaluation Criteria([\s\S]*?)## Additional Evaluation Factors/);
-  const scoringMatch = fullRubric.match(/## Scoring Guide([\s\S]*?)## Feedback Template/);
-  
-  let essentialRubric = '';
-  
-  if (criteriaMatch && criteriaMatch[1]) {
-    essentialRubric += criteriaMatch[1].trim() + '\n\n';
-  }
-  
-  if (scoringMatch && scoringMatch[1]) {
-    essentialRubric += scoringMatch[1].trim();
-  }
-  
-  return essentialRubric || fullRubric; // Fallback to full rubric if extraction fails
+// Embedded rubric content
+const EMBEDDED_RUBRIC = `## Evaluation Criteria
+
+### 1. Product Knowledge (30%)
+- Demonstrates comprehensive knowledge of wine characteristics, regions, and varietals
+- Accurately describes wine features, tasting notes, and food pairings
+- Understands wine production methods and quality factors
+- Can explain technical aspects in customer-friendly terms
+
+### 2. Customer Interaction (25%)
+- Establishes rapport and builds trust with customers
+- Uses active listening and asks relevant questions
+- Adapts communication style to customer preferences
+- Maintains professional and friendly demeanor
+
+### 3. Sales Techniques (25%)
+- Identifies customer needs and preferences effectively
+- Makes appropriate product recommendations
+- Handles objections professionally
+- Closes sales naturally and effectively
+
+### 4. Service Excellence (20%)
+- Provides personalized attention and assistance
+- Follows up on customer satisfaction
+- Maintains organized and attractive display areas
+- Demonstrates efficiency in handling transactions
+
+## Scoring Guide
+
+### Performance Levels
+- Outstanding (90-100%): Exceptional performance across all criteria
+- Exceeds Expectations (80-89%): Strong performance with minor areas for improvement
+- Meets Expectations (70-79%): Satisfactory performance with clear development areas
+- Below Expectations (60-69%): Performance needs significant improvement
+- Needs Improvement (<60%): Serious performance issues requiring immediate attention
+
+### Scoring Breakdown
+- 90-100%: Outstanding performance
+- 80-89%: Exceeds expectations
+- 70-79%: Meets expectations
+- 60-69%: Below expectations
+- Below 60%: Needs improvement`;
+
+// Embedded evaluation example
+const EMBEDDED_EVALUATION_EXAMPLE = {
+  "staffName": "John Smith",
+  "date": "2024-03-15",
+  "overallScore": 85,
+  "performanceLevel": "Exceeds Expectations",
+  "criteriaScores": [
+    {
+      "criterion": "Product Knowledge",
+      "weight": 0.30,
+      "score": 90,
+      "weightedScore": 27,
+      "notes": "Demonstrated excellent knowledge of wine regions and varietals. Could improve on technical aspects of wine production."
+    },
+    {
+      "criterion": "Customer Interaction",
+      "weight": 0.25,
+      "score": 85,
+      "weightedScore": 21.25,
+      "notes": "Strong rapport building skills. Active listening needs improvement in some situations."
+    },
+    {
+      "criterion": "Sales Techniques",
+      "weight": 0.25,
+      "score": 80,
+      "weightedScore": 20,
+      "notes": "Good at identifying customer needs. Could work on handling objections more effectively."
+    },
+    {
+      "criterion": "Service Excellence",
+      "weight": 0.20,
+      "score": 85,
+      "weightedScore": 17,
+      "notes": "Consistently provides excellent service. Display areas could be better organized."
+    }
+  ],
+  "strengths": [
+    "Strong product knowledge",
+    "Excellent rapport building",
+    "Consistent service quality",
+    "Effective needs identification"
+  ],
+  "areasForImprovement": [
+    "Technical wine production knowledge",
+    "Active listening skills",
+    "Objection handling",
+    "Display organization"
+  ],
+  "keyRecommendations": [
+    "Complete advanced wine certification",
+    "Practice active listening techniques",
+    "Attend sales objection handling workshop",
+    "Implement new display organization system"
+  ]
 };
 
-// Simplify the example evaluation JSON
-const simplifyEvaluationExample = (fullExample: string): string => {
-  try {
-    const example = JSON.parse(fullExample);
-    
-    // Create a simplified version with just the structure
-    const simplified = {
-      staffName: example.staffName,
-      date: example.date,
-      overallScore: example.totalScore || example.overallScore,
-      performanceLevel: example.performanceLevel,
-      criteriaScores: example.criteriaScores.map((c: any) => ({
-        criterion: c.criterion,
-        weight: c.weight,
-        score: c.score,
-        weightedScore: c.weightedScore,
-        notes: c.notes.substring(0, 100) + '...' // Truncate notes
-      })),
-      strengths: example.strengths,
-      areasForImprovement: example.areasForImprovement,
-      keyRecommendations: example.keyRecommendations
-    };
-    
-    return JSON.stringify(simplified, null, 2);
-  } catch (error) {
-    console.error('Error simplifying evaluation example:', error);
-    return fullExample; // Fallback to full example if simplification fails
-  }
-};
-
-// Truncate conversation if it's too long
-const truncateConversation = (markdown: string, maxLength: number = 8000): string => {
-  if (markdown.length <= maxLength) {
-    return markdown;
-  }
-  
-  console.log(`Background function: Truncating conversation from ${markdown.length} to ${maxLength} characters`);
-  
-  // Try to find the middle section of the conversation
-  const startIndex = Math.floor(markdown.length / 2) - Math.floor(maxLength / 2);
-  const truncated = markdown.substring(startIndex, startIndex + maxLength);
-  
-  // Add a note about truncation
-  return `[Note: Conversation truncated for analysis. Showing middle section.]\n\n${truncated}\n\n[End of truncated conversation]`;
-};
-
-// Load the rubric file with caching
+// Load the rubric with caching
 const loadRubric = () => {
   if (cachedRubric) {
     console.log('Background function: Using cached rubric');
     return cachedRubric;
   }
   
-  console.log('Background function: Loading rubric file');
-  const rubricPath = path.join(process.cwd(), 'public', 'data', 'wines_sales_rubric.md');
-  console.log(`Background function: Rubric path: ${rubricPath}`);
-  let WINES_SALES_RUBRIC = '';
-  try {
-    WINES_SALES_RUBRIC = fs.readFileSync(rubricPath, 'utf8');
-    console.log('Background function: Rubric file loaded successfully');
-    
-    // Extract essential parts and cache
-    cachedRubric = extractEssentialRubric(WINES_SALES_RUBRIC);
-    console.log(`Background function: Extracted essential rubric (${cachedRubric.length} chars)`);
-  } catch (error) {
-    console.error('Background function: Error loading rubric file:', error);
-    // Try alternative path
-    const altRubricPath = path.join(__dirname, '..', '..', 'public', 'data', 'wines_sales_rubric.md');
-    console.log(`Background function: Trying alternative rubric path: ${altRubricPath}`);
-    try {
-      WINES_SALES_RUBRIC = fs.readFileSync(altRubricPath, 'utf8');
-      console.log('Background function: Rubric file loaded successfully from alternative path');
-      
-      // Extract essential parts and cache
-      cachedRubric = extractEssentialRubric(WINES_SALES_RUBRIC);
-      console.log(`Background function: Extracted essential rubric (${cachedRubric.length} chars)`);
-    } catch (altError) {
-      console.error('Background function: Error loading rubric file from alternative path:', altError);
-      throw new Error('Failed to load rubric file');
-    }
-  }
+  console.log('Background function: Using embedded rubric');
+  cachedRubric = EMBEDDED_RUBRIC;
   return cachedRubric;
 };
 
-// Load the example evaluation JSON with caching
+// Load the example evaluation with caching
 const loadEvaluationExample = () => {
   if (cachedEvaluationExample) {
     console.log('Background function: Using cached evaluation example');
     return cachedEvaluationExample;
   }
   
-  console.log('Background function: Loading example evaluation JSON');
-  const evaluationExamplePath = path.join(process.cwd(), 'public', 'data', 'evaluation_new.json');
-  console.log(`Background function: Example evaluation path: ${evaluationExamplePath}`);
-  let EVALUATION_EXAMPLE = '';
-  try {
-    EVALUATION_EXAMPLE = fs.readFileSync(evaluationExamplePath, 'utf8');
-    console.log('Background function: Example evaluation JSON loaded successfully');
-    
-    // Simplify and cache
-    cachedEvaluationExample = simplifyEvaluationExample(EVALUATION_EXAMPLE);
-    console.log(`Background function: Simplified evaluation example (${cachedEvaluationExample.length} chars)`);
-  } catch (error) {
-    console.error('Background function: Error loading example evaluation JSON:', error);
-    // Try alternative path
-    const altEvalPath = path.join(__dirname, '..', '..', 'public', 'data', 'evaluation_new.json');
-    console.log(`Background function: Trying alternative example evaluation path: ${altEvalPath}`);
-    try {
-      EVALUATION_EXAMPLE = fs.readFileSync(altEvalPath, 'utf8');
-      console.log('Background function: Example evaluation JSON loaded successfully from alternative path');
-      
-      // Simplify and cache
-      cachedEvaluationExample = simplifyEvaluationExample(EVALUATION_EXAMPLE);
-      console.log(`Background function: Simplified evaluation example (${cachedEvaluationExample.length} chars)`);
-    } catch (altError) {
-      console.error('Background function: Error loading example evaluation JSON from alternative path:', altError);
-      throw new Error('Failed to load example evaluation JSON');
-    }
-  }
+  console.log('Background function: Using embedded evaluation example');
+  cachedEvaluationExample = JSON.stringify(EMBEDDED_EVALUATION_EXAMPLE, null, 2);
   return cachedEvaluationExample;
 };
 
@@ -545,6 +527,22 @@ async function performBasicEvaluation(markdown: string): Promise<any> {
     ]
   };
 }
+
+// Truncate conversation if it's too long
+const truncateConversation = (markdown: string, maxLength: number = 8000): string => {
+  if (markdown.length <= maxLength) {
+    return markdown;
+  }
+  
+  console.log(`Background function: Truncating conversation from ${markdown.length} to ${maxLength} characters`);
+  
+  // Try to find the middle section of the conversation
+  const startIndex = Math.floor(markdown.length / 2) - Math.floor(maxLength / 2);
+  const truncated = markdown.substring(startIndex, startIndex + maxLength);
+  
+  // Add a note about truncation
+  return `[Note: Conversation truncated for analysis. Showing middle section.]\n\n${truncated}\n\n[End of truncated conversation]`;
+};
 
 // Process a job
 const processJob = async (jobId: string, markdown: string, fileName: string) => {
