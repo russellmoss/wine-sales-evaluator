@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Document, Page, Text, View, StyleSheet, PDFViewer, pdf } from '@react-pdf/renderer';
+import { Document, Page, Text, View, StyleSheet, PDFViewer, pdf, PDFDownloadLink } from '@react-pdf/renderer';
 import type { EvaluationData } from '@/types/evaluation';
 import LoadingIndicator from './LoadingIndicator';
+import { toast } from 'react-hot-toast';
 
 // Register fonts with error handling
 import { Font } from '@react-pdf/renderer';
@@ -167,6 +168,7 @@ const extractSuggestions = (notes: string): string[] => {
 interface PDFExportProps {
   evaluationData: EvaluationData;
   onClose: () => void;
+  fileName?: string;
 }
 
 // Separate component for the PDF document
@@ -286,48 +288,29 @@ const PDFDocument: React.FC<{ evaluationData: EvaluationData }> = ({ evaluationD
   );
 };
 
-const PDFExport: React.FC<PDFExportProps> = ({ evaluationData, onClose }) => {
+const PDFExport: React.FC<PDFExportProps> = ({ evaluationData, onClose, fileName = 'wine-sales-evaluation.pdf' }) => {
   const [isClient, setIsClient] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   // Set isClient to true when component mounts
   useEffect(() => {
     setIsClient(true);
-    setIsLoading(false);
   }, []);
 
-  const handleDownload = async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      
-      // Create PDF blob
-      const blob = await pdf(<PDFDocument evaluationData={evaluationData} />).toBlob();
-      
-      // Create download link
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `wine-evaluation-${evaluationData.staffName.replace(/\s+/g, '-').toLowerCase()}.pdf`;
-      
-      // Trigger download
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      // Clean up
-      URL.revokeObjectURL(url);
-      setIsLoading(false);
-    } catch (err) {
-      console.error('Error generating PDF:', err);
-      setError('Failed to generate PDF. Please try again.');
-      setIsLoading(false);
+  const handleExport = () => {
+    if (!evaluationData) {
+      toast.error('No evaluation data available to export');
+      return;
     }
+    
+    setIsGenerating(true);
+    // The actual download will be handled by the PDFDownloadLink component
+    toast.success('PDF generation started');
   };
 
   // Show loading state while waiting for client-side rendering
-  if (!isClient || isLoading) {
+  if (!isClient || isGenerating) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div className="bg-white p-8 rounded-lg shadow-xl max-w-md w-full">
@@ -374,19 +357,42 @@ const PDFExport: React.FC<PDFExportProps> = ({ evaluationData, onClose }) => {
         </div>
         
         <div className="flex-1 overflow-hidden">
-          <PDFViewer width="100%" height="100%">
-            <PDFDocument evaluationData={evaluationData} />
-          </PDFViewer>
+          <PDFDownloadLink
+            document={<PDFDocument evaluationData={evaluationData} />}
+            fileName={fileName}
+            onClick={handleExport}
+          >
+            {({ blob, url, loading, error }) => (
+              <button
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-500 flex items-center"
+                disabled={loading || !evaluationData}
+              >
+                {loading ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Generating PDF...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                    Export PDF
+                  </>
+                )}
+              </button>
+            )}
+          </PDFDownloadLink>
         </div>
         
-        <div className="mt-4 flex justify-end">
-          <button
-            onClick={handleDownload}
-            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
-          >
-            Download PDF
-          </button>
-        </div>
+        {error && (
+          <div className="mt-2 text-red-500 text-sm">
+            Error generating PDF: {error.message}
+          </div>
+        )}
       </div>
     </div>
   );
