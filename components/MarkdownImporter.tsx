@@ -2,12 +2,11 @@
 
 import React, { useState, useRef } from 'react';
 import { toast } from 'react-hot-toast';
-import type { WineEvaluation } from '@/types/evaluation';
-import { validateEvaluationData } from '../utils/validation';
-import { EvaluationData } from '../types/evaluation';
+import { validateEvaluationData } from '@/app/utils/validation';
+import { EvaluationData } from '@/app/types/evaluation';
 
 interface MarkdownImporterProps {
-  onAnalysisComplete: (evaluationData: WineEvaluation) => void;
+  onAnalysisComplete: (evaluationData: EvaluationData) => void;
   isAnalyzing: boolean;
   setIsAnalyzing: (value: boolean) => void;
 }
