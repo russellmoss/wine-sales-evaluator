@@ -37,6 +37,12 @@
   force = true
 
 [[redirects]]
+  from = "/api/check-job-status"
+  to = "/.netlify/functions/check-job-status"
+  status = 200
+  force = true
+
+[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200

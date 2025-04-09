@@ -865,7 +865,7 @@ Return ONLY THE JSON with no additional text. The JSON must match the example fo
       }
 
       // Ensure the evaluation data has the required fields
-      const requiredFields = ['staffName', 'date', 'overallScore', 'totalScore', 'criteriaScores', 'strengths', 'areasForImprovement'];
+      const requiredFields = ['staffName', 'date', 'overallScore', 'criteriaScores', 'strengths', 'areasForImprovement'];
       const missingFields = requiredFields.filter(field => !(field in evaluationData));
       
       if (missingFields.length > 0) {
@@ -876,7 +876,6 @@ Return ONLY THE JSON with no additional text. The JSON must match the example fo
           staffName: evaluationData.staffName || 'Unknown Staff',
           date: evaluationData.date || new Date().toISOString().split('T')[0],
           overallScore: evaluationData.overallScore || 0,
-          totalScore: evaluationData.totalScore || 0,
           criteriaScores: Array.isArray(evaluationData.criteriaScores) ? evaluationData.criteriaScores : [],
           strengths: Array.isArray(evaluationData.strengths) ? evaluationData.strengths : [],
           areasForImprovement: Array.isArray(evaluationData.areasForImprovement) ? evaluationData.areasForImprovement : [],
@@ -926,10 +925,8 @@ Return ONLY THE JSON with no additional text. The JSON must match the example fo
             return sum + (typeof criteria.score === 'number' ? criteria.score : 0);
           }, 0);
           evaluationData.overallScore = Math.round(totalScore / evaluationData.criteriaScores.length);
-          evaluationData.totalScore = totalScore;
         } else {
           evaluationData.overallScore = 0;
-          evaluationData.totalScore = 0;
         }
       }
 

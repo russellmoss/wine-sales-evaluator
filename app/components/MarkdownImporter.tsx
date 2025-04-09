@@ -15,6 +15,8 @@ const MarkdownImporter: FC<MarkdownImporterProps> = ({ onAnalysisComplete, isAna
   const [markdown, setMarkdown] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [evaluationData, setEvaluationData] = useState<EvaluationData | null>(null);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -30,119 +32,65 @@ const MarkdownImporter: FC<MarkdownImporterProps> = ({ onAnalysisComplete, isAna
   };
 
   const analyzeConversation = async () => {
-    if (!markdown) {
-      toast.error('Please select a markdown file first');
-      return;
-    }
-    
-    setIsAnalyzing(true);
-    
     try {
-      // Call the API to analyze the conversation
-      const response = await fetch('/api/analyze-conversation', {
+      setIsAnalyzing(true);
+      setError(null);
+
+      // Start the analysis job
+      const response = await fetch('/.netlify/functions/analyze-conversation', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ 
-          markdown,
-          fileName 
+        body: JSON.stringify({
+          markdown: markdown,
+          fileName: fileName
         }),
       });
-      
-      // Get the response text first
-      const responseText = await response.text();
-      
-      // Handle non-OK responses
+
       if (!response.ok) {
-        let errorMessage = `Error: ${response.status}`;
+        throw new Error(`Error starting analysis: ${response.status}`);
+      }
+
+      const { jobId } = await response.json();
+
+      // Poll for job status
+      let completed = false;
+      let result = null;
+
+      while (!completed) {
+        // Wait 3 seconds between polls
+        await new Promise(resolve => setTimeout(resolve, 3000));
         
-        try {
-          // Try to parse the error as JSON
-          const errorData = JSON.parse(responseText);
-          if (errorData.message) {
-            errorMessage = errorData.message;
-          } else if (errorData.error) {
-            errorMessage = errorData.error;
-          }
-        } catch (e) {
-          // If the error can't be parsed as JSON, use the raw text
-          if (responseText) {
-            errorMessage = responseText.substring(0, 100); // Limit error message length
-          }
+        const statusResponse = await fetch(`/.netlify/functions/check-job-status?jobId=${jobId}`, {
+          method: 'GET'
+        });
+        
+        if (!statusResponse.ok) {
+          throw new Error(`Error checking status: ${statusResponse.status}`);
         }
         
-        throw new Error(errorMessage);
-      }
-      
-      // Try multiple approaches to extract valid JSON from the response
-      let evaluationData: EvaluationData | null = null;
-      let parseError: Error | null = null;
-      
-      // Approach 1: Direct JSON parse
-      try {
-        evaluationData = JSON.parse(responseText);
-      } catch (e) {
-        parseError = e as Error;
-        console.log('Direct JSON parse failed, trying alternative approaches');
-      }
-      
-      // Approach 2: Look for JSON code blocks
-      if (!evaluationData) {
-        const codeBlockMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-        if (codeBlockMatch) {
-          try {
-            evaluationData = JSON.parse(codeBlockMatch[1].trim());
-            console.log('Successfully extracted JSON from code block');
-          } catch (e) {
-            console.log('Failed to parse JSON from code block');
-          }
+        const job = await statusResponse.json();
+        
+        if (job.status === 'completed') {
+          completed = true;
+          result = job.result;
+        } else if (job.status === 'failed') {
+          throw new Error(job.error || 'Analysis failed');
         }
+        
+        // If still processing, continue polling
       }
-      
-      // Approach 3: Look for JSON object with curly braces
-      if (!evaluationData) {
-        const jsonMatch = responseText.match(/(\{[\s\S]*\})/);
-        if (jsonMatch) {
-          try {
-            evaluationData = JSON.parse(jsonMatch[0]);
-            console.log('Successfully extracted JSON from text');
-          } catch (e) {
-            console.log('Failed to parse JSON from text match');
-          }
-        }
+
+      // Validate the evaluation data
+      if (!result || !validateEvaluationData(result)) {
+        throw new Error('Invalid evaluation data received');
       }
-      
-      // Approach 4: Look for JSON array with square brackets
-      if (!evaluationData) {
-        const arrayMatch = responseText.match(/(\[[\s\S]*\])/);
-        if (arrayMatch) {
-          try {
-            evaluationData = JSON.parse(arrayMatch[0]);
-            console.log('Successfully extracted JSON array from text');
-          } catch (e) {
-            console.log('Failed to parse JSON array from text match');
-          }
-        }
-      }
-      
-      // If all approaches failed, throw an error
-      if (!evaluationData) {
-        console.error('All JSON parsing attempts failed:', parseError);
-        throw new Error('Failed to parse evaluation data from response');
-      }
-      
-      // Validate the evaluation data structure
-      const validationResult = validateEvaluationData(evaluationData);
-      if (!validationResult.isValid) {
-        console.warn('Validation issues found:', validationResult.errors);
-        toast.error('The evaluation data has some issues, but we\'ll try to use it anyway');
-      }
-      
-      // Use the validated data
-      onAnalysisComplete(validationResult.data);
-      toast.success('Conversation analyzed successfully!');
-      
+
+      // Update the evaluation data
+      setEvaluationData(result);
+      toast.success('Analysis completed successfully');
+
       // Reset the form
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
@@ -152,7 +100,8 @@ const MarkdownImporter: FC<MarkdownImporterProps> = ({ onAnalysisComplete, isAna
       
     } catch (error) {
       console.error('Error analyzing conversation:', error);
-      toast.error(error instanceof Error ? error.message : 'Error analyzing conversation. Please try again.');
+      setError(error instanceof Error ? error.message : 'An error occurred during analysis');
+      toast.error('Failed to analyze conversation');
     } finally {
       setIsAnalyzing(false);
     }
