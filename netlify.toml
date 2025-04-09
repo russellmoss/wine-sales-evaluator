@@ -1,5 +1,5 @@
 [build]
-  command = "npm run build"
+  command = "npm run build:netlify"
   publish = "out"
   functions = "netlify/functions"
 
@@ -10,6 +10,7 @@
   NEXT_PUBLIC_CLAUDE_API_KEY = ""
   DEBUG = "*"
   NPM_FLAGS = "--legacy-peer-deps"
+  NEXT_PUBLIC_BASE_URL = "https://your-netlify-site.netlify.app"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
@@ -22,7 +23,7 @@
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
-  external_node_modules = ["@anthropic-ai/sdk", "tailwindcss", "postcss", "autoprefixer"]
+  external_node_modules = ["@anthropic-ai/sdk"]
 
 [functions.analyze-conversation]
   included_files = ["public/data/**"]
@@ -39,4 +40,21 @@
 [dev.environment]
   NODE_ENV = "development"
   NETLIFY_DEV = "true"
-  DEBUG = "*" 
+  DEBUG = "*"
+
+[build.processing]
+  skip_processing = false
+
+[build.processing.css]
+  bundle = true
+  minify = true
+
+[build.processing.js]
+  bundle = true
+  minify = true
+
+[build.processing.html]
+  pretty_urls = true
+
+[build.processing.images]
+  compress = true 
