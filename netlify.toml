@@ -9,6 +9,8 @@
   NODE_ENV = "production"
   DEBUG = "*"
   NPM_FLAGS = "--legacy-peer-deps"
+  CLAUDE_API_KEY = "your-api-key"
+  NEXT_PUBLIC_CLAUDE_API_KEY = "your-api-key"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
@@ -21,7 +23,12 @@
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
-  external_node_modules = ["@anthropic-ai/sdk"]
+  external_node_modules = ["@anthropic-ai/sdk", "uuid"]
+
+[[functions]]
+  pattern = "analyze-conversation"
+  included_files = ["public/data/*", "tmp/**/*"]
+  timeout = 60
 
 [functions.analyze-conversation]
   included_files = ["public/data/wines_sales_rubric.md", "public/data/evaluation_new.json"]
