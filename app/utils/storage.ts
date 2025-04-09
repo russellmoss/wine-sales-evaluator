@@ -41,8 +41,15 @@ export class FileStorageProvider implements StorageProvider {
       }
     } catch (error) {
       console.error(`Error creating jobs directory: ${this.jobsDir}`, error);
-      // If we can't create the directory, try using /tmp as a fallback
-      if (this.jobsDir !== '/tmp/jobs') {
+      
+      // In Netlify environment, always use /tmp/jobs
+      if (process.env.NETLIFY === 'true') {
+        console.log('Netlify environment detected, using /tmp/jobs directory');
+        this.jobsDir = '/tmp/jobs';
+        this.ensureJobsDir();
+      } 
+      // If we can't create the directory and not in Netlify, try using /tmp as a fallback
+      else if (this.jobsDir !== '/tmp/jobs') {
         console.log('Falling back to /tmp/jobs directory');
         this.jobsDir = '/tmp/jobs';
         this.ensureJobsDir();
@@ -252,16 +259,19 @@ export function createStorageProvider(): StorageProvider {
   const defaultJobsDir = isNetlify ? '/tmp/jobs' : path.join(process.cwd(), 'tmp', 'jobs');
   const jobsDir = process.env.JOB_STORAGE_DIR || defaultJobsDir;
   
+  // In Netlify environment, always use /tmp/jobs regardless of configuration
+  const finalJobsDir = isNetlify ? '/tmp/jobs' : jobsDir;
+  
   const maxAge = parseInt(process.env.JOB_MAX_AGE || '86400000', 10); // Default: 24 hours in milliseconds
   
-  console.log(`Initializing ${storageType} storage provider with directory: ${jobsDir}`);
+  console.log(`Initializing ${storageType} storage provider with directory: ${finalJobsDir}`);
   
   switch (storageType.toLowerCase()) {
     case 'memory':
       return new MemoryStorageProvider(maxAge);
     case 'file':
     default:
-      return new FileStorageProvider(jobsDir, maxAge);
+      return new FileStorageProvider(finalJobsDir, maxAge);
   }
 }
 
