@@ -1010,6 +1010,7 @@ export const handler: Handler = async (event: HandlerEvent, context: HandlerCont
       console.error(`Background function: Unhandled error in processJob:`, error);
     });
     
+    // Return immediately to prevent timeout
     return {
       statusCode: 202,
       body: JSON.stringify({ message: 'Job processing started' })
