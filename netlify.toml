@@ -23,7 +23,9 @@
   node_bundler = "esbuild"
   external_node_modules = ["@anthropic-ai/sdk", "@netlify/functions"]
   included_files = ["public/data/**"]
-  timeout = "60"
+
+[functions.timeout]
+  external_node_modules = ["@anthropic-ai/sdk", "@netlify/functions"]
 
 [functions.analyze-conversation]
   included_files = ["public/data/**"]
