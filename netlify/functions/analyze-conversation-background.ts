@@ -681,7 +681,7 @@ const processJob = async (jobId: string, markdown: string, fileName: string) => 
   await storage.saveJob(job);
   
   try {
-    // Load the rubric and example eval
+    // Load the rubric and example eval using the cached versions
     const WINES_SALES_RUBRIC = loadRubric();
     const EVALUATION_EXAMPLE = loadEvaluationExample();
     

@@ -23,7 +23,6 @@
 
 [functions.pattern]
   external_node_modules = ["@anthropic-ai/sdk", "uuid"]
-  included_files = ["public/data/*"]
   timeout = 60
 
 [[redirects]]
@@ -77,4 +76,4 @@
   timeout = 300
 
 [functions.analyze-conversation-background]
-  timeout = 60 
+  timeout = 900 
