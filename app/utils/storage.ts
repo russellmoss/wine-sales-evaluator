@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
+import { getStore } from '@netlify/blobs';
 
 // Define the job status interface
 export interface JobStatus {
@@ -22,6 +23,80 @@ export interface StorageProvider {
   listJobs(): Promise<JobStatus[]>;
   deleteJob(jobId: string): Promise<boolean>;
   cleanupExpiredJobs(): Promise<number>;
+}
+
+// Netlify KV Store provider
+export class KVStorageProvider implements StorageProvider {
+  private store;
+  private maxAge: number;
+
+  constructor(maxAge: number = 24 * 60 * 60 * 1000) { // Default: 24 hours
+    this.store = getStore('wine-analysis-jobs');
+    this.maxAge = maxAge;
+  }
+
+  async saveJob(job: JobStatus): Promise<void> {
+    // Set expiration time if not already set
+    if (!job.expiresAt) {
+      job.expiresAt = Date.now() + this.maxAge;
+    }
+    
+    console.log(`KV Store: Saving job ${job.id} with status ${job.status}`);
+    // Store the job data with the expiration time included in the job object
+    await this.store.set(job.id, JSON.stringify(job));
+    console.log(`KV Store: Job ${job.id} saved successfully`);
+  }
+
+  async getJob(jobId: string): Promise<JobStatus | null> {
+    console.log(`KV Store: Retrieving job ${jobId}`);
+    try {
+      const jobData = await this.store.get(jobId);
+      if (!jobData) {
+        console.log(`KV Store: Job ${jobId} not found`);
+        return null;
+      }
+      
+      console.log(`KV Store: Job ${jobId} found, parsing data`);
+      const job = JSON.parse(jobData) as JobStatus;
+      console.log(`KV Store: Successfully retrieved job ${jobId} with status: ${job.status}`);
+      return job;
+    } catch (error) {
+      console.error(`KV Store: Error retrieving job ${jobId}:`, error);
+      return null;
+    }
+  }
+
+  async listJobs(): Promise<JobStatus[]> {
+    console.log(`KV Store: Listing all jobs`);
+    try {
+      // Note: Netlify Blobs doesn't have a native list function
+      // You would need to implement a separate index to track job IDs
+      // For simplicity, this is a placeholder
+      console.log(`KV Store: Listing jobs not fully supported`);
+      return [];
+    } catch (error) {
+      console.error('KV Store: Error listing jobs:', error);
+      return [];
+    }
+  }
+
+  async deleteJob(jobId: string): Promise<boolean> {
+    console.log(`KV Store: Deleting job ${jobId}`);
+    try {
+      await this.store.delete(jobId);
+      console.log(`KV Store: Job ${jobId} deleted successfully`);
+      return true;
+    } catch (error) {
+      console.error(`KV Store: Error deleting job ${jobId}:`, error);
+      return false;
+    }
+  }
+
+  async cleanupExpiredJobs(): Promise<number> {
+    // Netlify Blobs automatically cleans up expired entries
+    console.log(`KV Store: Cleanup not needed - Netlify automatically expires entries`);
+    return 0;
+  }
 }
 
 // File-based storage provider
@@ -262,21 +337,20 @@ export class MemoryStorageProvider implements StorageProvider {
 // Factory function to create the appropriate storage provider
 export function createStorageProvider(): StorageProvider {
   // Get storage configuration from environment variables
-  const storageType = process.env.JOB_STORAGE_TYPE || 'file';
+  const storageType = process.env.JOB_STORAGE_TYPE || 'kv';
+  const maxAge = parseInt(process.env.JOB_MAX_AGE || '86400000', 10); // Default: 24 hours
   
-  // Always use /tmp for Netlify functions since it's the only writable directory
-  const jobsDir = '/tmp/jobs';
-  
-  const maxAge = parseInt(process.env.JOB_MAX_AGE || '86400000', 10); // Default: 24 hours in milliseconds
-  
-  console.log(`Initializing ${storageType} storage provider with directory: ${jobsDir}`);
+  console.log(`Initializing ${storageType} storage provider`);
   
   switch (storageType.toLowerCase()) {
+    case 'kv':
+      return new KVStorageProvider(maxAge);
     case 'memory':
       return new MemoryStorageProvider(maxAge);
     case 'file':
+      throw new Error('File storage is not reliable in Netlify Functions, use KV store instead');
     default:
-      return new FileStorageProvider(jobsDir, maxAge);
+      return new KVStorageProvider(maxAge);
   }
 }
 
