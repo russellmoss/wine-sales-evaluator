@@ -640,7 +640,7 @@ Return ONLY THE JSON with no additional text. The JSON must match the example fo
     
     // Save debug info before calling Claude
     saveDebugInfo(jobId, 'request', {
-      model: "claude-3-sonnet-20240229",
+      model: "claude-3-sonnet",
       system: systemPrompt,
       userPrompt: userPrompt.substring(0, 1000) + '...' // Truncate for logs
     });
@@ -653,7 +653,7 @@ Return ONLY THE JSON with no additional text. The JSON must match the example fo
     });
     
     const response = await anthropic.messages.create({
-      model: "claude-3-sonnet-20240229",
+      model: "claude-3-sonnet",
       max_tokens: 4000,
       system: systemPrompt,
       messages: [

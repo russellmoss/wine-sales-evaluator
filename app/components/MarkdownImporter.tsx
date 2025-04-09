@@ -129,7 +129,6 @@ const MarkdownImporter: FC<MarkdownImporterProps> = ({ onAnalysisComplete, isAna
       // If all approaches failed, throw an error
       if (!evaluationData) {
         console.error('All JSON parsing attempts failed:', parseError);
-        console.log('Invalid response text:', responseText.substring(0, 500) + '...');
         throw new Error('Failed to parse evaluation data from response');
       }
       
