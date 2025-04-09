@@ -10,7 +10,7 @@
   DEBUG = "*"
   NPM_FLAGS = "--legacy-peer-deps"
 
-[plugins]
+[[plugins]]
   package = "@netlify/plugin-nextjs"
 
 [[functions]]
