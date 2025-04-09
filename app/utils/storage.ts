@@ -34,8 +34,21 @@ export class FileStorageProvider implements StorageProvider {
   }
 
   private ensureJobsDir(): void {
-    if (!fs.existsSync(this.jobsDir)) {
-      fs.mkdirSync(this.jobsDir, { recursive: true });
+    try {
+      if (!fs.existsSync(this.jobsDir)) {
+        console.log(`Creating jobs directory: ${this.jobsDir}`);
+        fs.mkdirSync(this.jobsDir, { recursive: true });
+      }
+    } catch (error) {
+      console.error(`Error creating jobs directory: ${this.jobsDir}`, error);
+      // If we can't create the directory, try using /tmp as a fallback
+      if (this.jobsDir !== '/tmp/jobs') {
+        console.log('Falling back to /tmp/jobs directory');
+        this.jobsDir = '/tmp/jobs';
+        this.ensureJobsDir();
+      } else {
+        throw new Error(`Failed to create jobs directory: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
     }
   }
 
@@ -233,7 +246,12 @@ export class MemoryStorageProvider implements StorageProvider {
 export function createStorageProvider(): StorageProvider {
   // Get storage configuration from environment variables
   const storageType = process.env.JOB_STORAGE_TYPE || 'file';
-  const jobsDir = process.env.JOB_STORAGE_DIR || path.join(process.cwd(), 'tmp', 'jobs');
+  
+  // Use /tmp directory in Netlify environment, otherwise use the configured directory
+  const isNetlify = process.env.NETLIFY === 'true';
+  const defaultJobsDir = isNetlify ? '/tmp/jobs' : path.join(process.cwd(), 'tmp', 'jobs');
+  const jobsDir = process.env.JOB_STORAGE_DIR || defaultJobsDir;
+  
   const maxAge = parseInt(process.env.JOB_MAX_AGE || '86400000', 10); // Default: 24 hours in milliseconds
   
   console.log(`Initializing ${storageType} storage provider with directory: ${jobsDir}`);
