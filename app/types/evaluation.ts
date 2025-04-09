@@ -36,8 +36,6 @@ export interface EvaluationData {
   
   // Optional fields
   totalScore?: number;              // Alternative field for overallScore (will be converted)
-  isValid?: boolean;                // Whether the evaluation data is valid
-  errors?: ValidationError[];       // Array of validation errors if any
 }
 
 // Validation error interface
