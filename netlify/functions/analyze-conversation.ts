@@ -527,7 +527,7 @@ export const handler: Handler = async (event: HandlerEvent, context: HandlerCont
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        jobId: job.id,
+        job: job,
         markdown,
         fileName
       })

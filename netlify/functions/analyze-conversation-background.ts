@@ -690,39 +690,11 @@ const truncateConversation = (markdown: string, maxLength: number = 8000): strin
 };
 
 // Process a job
-const processJob = async (jobId: string, markdown: string, fileName: string) => {
-  console.log(`Background function: Processing job ${jobId}`);
+const processJob = async (job: JobStatus, markdown: string, fileName: string) => {
+  console.log(`Background function: Processing job ${job.id}`);
   
   // Get the storage provider
   const storage = getStorageProvider();
-  
-  // Get the job with retries
-  let job = null;
-  let retryCount = 0;
-  const maxRetries = 3;
-  
-  while (!job && retryCount < maxRetries) {
-    job = await storage.getJob(jobId);
-    if (!job) {
-      console.log(`Background function: Job ${jobId} not found, retry ${retryCount + 1}/${maxRetries}`);
-      retryCount++;
-      if (retryCount < maxRetries) {
-        // Wait for 1 second before retrying
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-    }
-  }
-  
-  if (!job) {
-    throw new Error(`Job ${jobId} not found after ${maxRetries} retries`);
-  }
-  
-  console.log(`Background function: Retrieved job ${jobId} with status ${job.status}`);
-  
-  // Update job status to processing
-  job.status = 'processing';
-  job.updatedAt = Date.now();
-  await storage.saveJob(job);
   
   try {
     // Load the rubric and example eval using the cached versions
@@ -808,7 +780,7 @@ ${truncatedMarkdown}
 Return ONLY THE JSON with no additional text. The JSON must match the example format exactly.`;
     
     // Save debug info before calling Claude
-    saveDebugInfo(jobId, 'request', {
+    saveDebugInfo(job.id, 'request', {
       model: "claude-3-7-sonnet-20250219",
       system: systemPrompt,
       userPrompt: userPrompt.substring(0, 1000) + '...' // Truncate for logs
@@ -844,7 +816,7 @@ Return ONLY THE JSON with no additional text. The JSON must match the example fo
     }
     
     // Save debug info after getting Claude's response
-    saveDebugInfo(jobId, 'response', {
+    saveDebugInfo(job.id, 'response', {
       responseText: responseText.substring(0, 5000) + '...' // Truncate for logs
     });
     
@@ -875,13 +847,13 @@ Return ONLY THE JSON with no additional text. The JSON must match the example fo
       }
       
       // Save debug info after processing the response
-      saveDebugInfo(jobId, 'processed', {
+      saveDebugInfo(job.id, 'processed', {
         evaluationData: evaluationData
       });
       
       // Log the structure to see what fields are present/missing
       console.log('Background function: Parsed evaluation data structure:', Object.keys(evaluationData));
-     
+      
       // Validate the evaluation data structure
       if (!evaluationData || typeof evaluationData !== 'object') {
         console.error('Background function: Invalid evaluation data structure:', evaluationData);
@@ -966,9 +938,9 @@ Return ONLY THE JSON with no additional text. The JSON must match the example fo
       job.result = evaluationData;
       job.updatedAt = Date.now();
       await storage.saveJob(job);
-      console.log(`Background function: Job ${jobId} completed successfully`);
+      console.log(`Background function: Job ${job.id} completed successfully`);
     } catch (error) {
-      console.error(`Background function: Error processing job ${jobId}:`, error);
+      console.error(`Background function: Error processing job ${job.id}:`, error);
       
       // Update job with the error
       job.status = 'failed';
@@ -979,7 +951,7 @@ Return ONLY THE JSON with no additional text. The JSON must match the example fo
       throw error;
     }
   } catch (error) {
-    console.error(`Background function: Error processing job ${jobId}:`, error);
+    console.error(`Background function: Error processing job ${job.id}:`, error);
     throw error;
   }
 };
@@ -1007,12 +979,12 @@ export const handler: Handler = async (event: HandlerEvent, context: HandlerCont
       };
     }
     
-    const { jobId, markdown, fileName } = JSON.parse(event.body);
+    const { job, markdown, fileName } = JSON.parse(event.body);
     
-    if (!jobId) {
+    if (!job) {
       return {
         statusCode: 400,
-        body: JSON.stringify({ error: 'No job ID provided' })
+        body: JSON.stringify({ error: 'No job provided' })
       };
     }
     
@@ -1023,8 +995,18 @@ export const handler: Handler = async (event: HandlerEvent, context: HandlerCont
       };
     }
     
+    // Get the storage provider
+    const storage = getStorageProvider();
+    
+    console.log(`Background function: Processing job ${job.id}`);
+    
+    // Update job status to processing
+    job.status = 'processing';
+    job.updatedAt = Date.now();
+    await storage.saveJob(job);
+    
     // Process the job asynchronously
-    processJob(jobId, markdown, fileName).catch(error => {
+    processJob(job, markdown, fileName).catch(error => {
       console.error(`Background function: Unhandled error in processJob:`, error);
     });
     
