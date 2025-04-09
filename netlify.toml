@@ -15,6 +15,15 @@
 [build.environment]
   NODE_ENV = "production"
   NEXT_TELEMETRY_DISABLED = "1"
+  CLAUDE_API_KEY = "sk-ant-api03-..."
+  NEXT_PUBLIC_CLAUDE_API_KEY = "sk-ant-api03-..."
+  DEBUG = "*"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+[functions.analyze-conversation]
+  included_files = ["public/data/**"]
 
 [dev]
   command = "npm run dev"
@@ -27,16 +36,4 @@
 [dev.environment]
   NODE_ENV = "development"
   NETLIFY_DEV = "true"
-  DEBUG = "*"
-
-[build.environment]
-  CLAUDE_API_KEY = "sk-ant-api03-..."
-  NEXT_PUBLIC_CLAUDE_API_KEY = "sk-ant-api03-..."
-  DEBUG = "*"
-
-[[plugins]]
-  package = "@netlify/plugin-nextjs"
-
-[functions.analyze-conversation]
-  included_files = ["public/data/**"]
-  timeout = 60 
+  DEBUG = "*" 
