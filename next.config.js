@@ -5,10 +5,6 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  // Disable server-side features for static export
-  experimental: {
-    appDir: true,
-  },
   // Ensure all dependencies are properly handled
   transpilePackages: ['@react-pdf/renderer', 'recharts'],
   // Disable webpack optimization for static export
