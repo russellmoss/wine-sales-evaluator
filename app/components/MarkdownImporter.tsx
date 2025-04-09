@@ -66,8 +66,14 @@ const MarkdownImporter: React.FC<MarkdownImporterProps> = ({
       }
       
       // Handle both overallScore and totalScore fields
-      if (!evaluationData.overallScore && evaluationData.totalScore !== undefined) {
+      if (evaluationData.totalScore !== undefined) {
         evaluationData.overallScore = evaluationData.totalScore;
+      } else if (evaluationData.overallScore === undefined) {
+        // Calculate overallScore from criteriaScores if neither field is present
+        const totalWeightedScore = evaluationData.criteriaScores.reduce((sum: number, criterion: any) => {
+          return sum + (criterion.weightedScore || 0);
+        }, 0);
+        evaluationData.overallScore = Math.round(totalWeightedScore / 5);
       }
       
       // Ensure overallScore is a number
@@ -77,6 +83,11 @@ const MarkdownImporter: React.FC<MarkdownImporterProps> = ({
       
       if (typeof evaluationData.overallScore !== 'number' || isNaN(evaluationData.overallScore)) {
         throw new Error('The evaluation data returned does not have a valid overallScore');
+      }
+      
+      // Ensure the score is a percentage (0-100)
+      if (evaluationData.overallScore > 100) {
+        evaluationData.overallScore = Math.round((evaluationData.overallScore / 500) * 100);
       }
       
       onAnalysisComplete(evaluationData);

@@ -66,8 +66,14 @@ export default function DetailedResultsPage() {
       }
       
       // Handle both overallScore and totalScore fields
-      if (!parsedData.overallScore && parsedData.totalScore !== undefined) {
+      if (parsedData.totalScore !== undefined) {
         parsedData.overallScore = parsedData.totalScore;
+      } else if (parsedData.overallScore === undefined) {
+        // Calculate overallScore from criteriaScores if neither field is present
+        const totalWeightedScore = parsedData.criteriaScores.reduce((sum: number, criterion: any) => {
+          return sum + (criterion.weightedScore || 0);
+        }, 0);
+        parsedData.overallScore = Math.round(totalWeightedScore / 5);
       }
       
       // Ensure overallScore is a number
@@ -80,6 +86,11 @@ export default function DetailedResultsPage() {
         setError('Invalid overallScore in evaluation data. Please upload a conversation again.');
         setLoading(false);
         return;
+      }
+      
+      // Ensure the score is a percentage (0-100)
+      if (parsedData.overallScore > 100) {
+        parsedData.overallScore = Math.round((parsedData.overallScore / 500) * 100);
       }
       
       // Set the evaluation data

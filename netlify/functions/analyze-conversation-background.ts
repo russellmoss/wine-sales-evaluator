@@ -343,22 +343,30 @@ Return ONLY THE JSON with no additional text.`;
       }
       
       // Handle both overallScore and totalScore fields
-      if (!evaluationData.overallScore && evaluationData.totalScore !== undefined) {
+      if (evaluationData.totalScore !== undefined) {
         console.log('Background function: Using totalScore as overallScore');
         evaluationData.overallScore = evaluationData.totalScore;
+      } else if (evaluationData.overallScore === undefined) {
+        // Calculate overallScore from criteriaScores if neither field is present
+        const totalWeightedScore = evaluationData.criteriaScores.reduce((sum, criterion) => {
+          return sum + (criterion.weightedScore || 0);
+        }, 0);
+        evaluationData.overallScore = Math.round(totalWeightedScore / 5);
       }
       
       // Ensure overallScore is a number
       if (typeof evaluationData.overallScore === 'string') {
         console.log('Background function: Converting overallScore from string to number');
         evaluationData.overallScore = parseFloat(evaluationData.overallScore);
-        if (isNaN(evaluationData.overallScore)) {
-          throw new Error('overallScore could not be converted to a number');
-        }
       }
       
-      if (typeof evaluationData.overallScore !== 'number') {
-        throw new Error('overallScore must be a number');
+      if (typeof evaluationData.overallScore !== 'number' || isNaN(evaluationData.overallScore)) {
+        throw new Error('overallScore must be a valid number');
+      }
+      
+      // Ensure the score is a percentage (0-100)
+      if (evaluationData.overallScore > 100) {
+        evaluationData.overallScore = Math.round((evaluationData.overallScore / 500) * 100);
       }
       
       // Ensure criteriaScores is properly formatted
