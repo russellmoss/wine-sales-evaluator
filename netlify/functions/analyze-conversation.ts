@@ -11,10 +11,18 @@ async function evaluateDirectly(markdown: string): Promise<any> {
     apiKey: process.env.CLAUDE_API_KEY || '',
   });
   
-  // Create a simplified system prompt
-  const systemPrompt = `You are a wine sales performance evaluator analyzing a conversation between a winery staff member and guests. Evaluate the conversation based on 10 key criteria and provide your assessment in JSON format.`;
+  // Create a more detailed system prompt
+  const systemPrompt = `You are a wine sales performance evaluator analyzing a conversation between a winery staff member and guests. 
+  
+Your task is to provide a detailed, objective evaluation based on the conversation. For each criterion, you should:
+1. Identify specific examples from the conversation that demonstrate performance
+2. Explain what was done well and why it was effective
+3. Identify specific areas for improvement with concrete suggestions
+4. Provide a fair score based on the evidence
 
-  // Create a simplified user prompt
+Be thorough but concise in your analysis. Focus on actionable feedback that will help the staff member improve.`;
+
+  // Create a more detailed user prompt
   const userPrompt = `Evaluate this wine tasting conversation and return a JSON with these fields:
 - staffName (extract from conversation)
 - date (extract from conversation, format as YYYY-MM-DD)
@@ -37,6 +45,12 @@ The 10 criteria to evaluate (with weights) are:
 9. Wine Club Presentation (12%)
 10. Closing Interaction (8%)
 
+For each criterion, provide detailed notes that include:
+1. Specific examples from the conversation that demonstrate performance
+2. What was done well and why it was effective
+3. What could be improved with concrete suggestions
+4. A fair score based on the evidence
+
 The weighted score for each criterion should be calculated as: score × weight.
 The overall score should be calculated as the sum of all weighted scores divided by 5, to get a percentage.
 
@@ -46,9 +60,9 @@ ${markdown.substring(0, 15000)}${markdown.length > 15000 ? '...(truncated)' : ''
 Return ONLY the valid JSON with no additional explanation or text.`;
 
   try {
-    // Call Claude API
+    // Call Claude API with Claude 3 Sonnet
     const response = await anthropic.messages.create({
-      model: "claude-3-haiku-20240307",
+      model: "claude-3-sonnet-20240229",
       max_tokens: 4000,
       system: systemPrompt,
       messages: [

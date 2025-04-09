@@ -569,7 +569,7 @@ const processJob = async (jobId: string, markdown: string, fileName: string) => 
     // Truncate conversation if needed
     const truncatedMarkdown = truncateConversation(markdown);
     
-    // Prepare the system prompt for Claude - updated to be more explicit about JSON output
+    // Prepare the system prompt for Claude - updated to be more explicit about JSON output and detailed feedback
     const systemPrompt = `You are a wine sales performance evaluator. Your task is to analyze the conversation and output ONLY a valid JSON object with no additional text or explanations. 
     
 IMPORTANT INSTRUCTIONS:
@@ -577,9 +577,17 @@ IMPORTANT INSTRUCTIONS:
 2. Do not include any markdown formatting, text before or after the JSON
 3. Do not include any explanations or comments outside the JSON
 4. Follow the exact structure in the example provided
-5. Ensure all required fields are present and correctly formatted`;
+5. Ensure all required fields are present and correctly formatted
 
-    // Prepare the user prompt with a more structured JSON schema
+For each criterion, provide detailed notes that include:
+1. Specific examples from the conversation that demonstrate performance
+2. What was done well and why it was effective
+3. What could be improved with concrete suggestions
+4. A fair score based on the evidence
+
+Be thorough but concise in your analysis. Focus on actionable feedback that will help the staff member improve.`;
+
+    // Prepare the user prompt with a more structured JSON schema and detailed feedback requirements
     const userPrompt = `Evaluate this wine tasting conversation against the provided rubric. Return ONLY a JSON object with the following structure:
 
 {
@@ -593,7 +601,7 @@ IMPORTANT INSTRUCTIONS:
       "weight": number, // As per the rubric
       "score": number, // Your rating (1-5)
       "weightedScore": number, // score × weight
-      "notes": "string" // Your explanation
+      "notes": "string" // Your detailed analysis including specific examples, strengths, and areas for improvement
     },
     // Exactly 10 criteria as in the rubric
   ],
@@ -619,7 +627,11 @@ Instructions:
    - Developing: 60-69%
    - Needs Improvement: <60%
 5. Include 3 strengths, 3 areas for improvement, 3 recommendations
-6. Write notes for each criterion
+6. Write detailed notes for each criterion that include:
+   - Specific examples from the conversation
+   - What was done well and why it was effective
+   - What could be improved with concrete suggestions
+   - A fair score based on the evidence
 
 Conversation to evaluate:
 ${truncatedMarkdown}
@@ -628,20 +640,20 @@ Return ONLY THE JSON with no additional text. The JSON must match the example fo
     
     // Save debug info before calling Claude
     saveDebugInfo(jobId, 'request', {
-      model: "claude-3-haiku-20240307",
+      model: "claude-3-sonnet-20240229",
       system: systemPrompt,
       userPrompt: userPrompt.substring(0, 1000) + '...' // Truncate for logs
     });
     
     console.log('Background function: Calling Claude API');
     
-    // Call Claude API with streaming - updated to use non-streaming for more reliable JSON
+    // Call Claude API with Claude 3 Sonnet
     const anthropic = new Anthropic({
       apiKey: process.env.CLAUDE_API_KEY || '',
     });
     
     const response = await anthropic.messages.create({
-      model: "claude-3-haiku-20240307",
+      model: "claude-3-sonnet-20240229",
       max_tokens: 4000,
       system: systemPrompt,
       messages: [
