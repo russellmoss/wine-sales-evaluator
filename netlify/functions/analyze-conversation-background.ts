@@ -579,11 +579,17 @@ IMPORTANT INSTRUCTIONS:
 4. Follow the exact structure in the example provided
 5. Ensure all required fields are present and correctly formatted
 
-For each criterion, provide detailed notes that include:
-1. Specific examples from the conversation that demonstrate performance
-2. What was done well and why it was effective
-3. What could be improved with concrete suggestions
-4. A fair score based on the evidence
+For each criterion, you MUST:
+1. Quote specific examples from the conversation that demonstrate performance
+2. Explain what was done well and why it was effective, with concrete examples
+3. Identify specific areas for improvement with actionable suggestions
+4. Provide a fair score (1-5) based on the evidence
+5. Include detailed notes that explain your scoring rationale
+
+For each criterion, your notes should:
+- Start with "Strengths:" followed by specific examples and why they were effective
+- Then "Areas for Improvement:" with concrete suggestions
+- End with "Score Rationale:" explaining why you gave that score
 
 Be thorough but concise in your analysis. Focus on actionable feedback that will help the staff member improve.`;
 
@@ -640,7 +646,7 @@ Return ONLY THE JSON with no additional text. The JSON must match the example fo
     
     // Save debug info before calling Claude
     saveDebugInfo(jobId, 'request', {
-      model: "claude-3-sonnet",
+      model: "claude-3-7-sonnet-20250219",
       system: systemPrompt,
       userPrompt: userPrompt.substring(0, 1000) + '...' // Truncate for logs
     });
@@ -653,7 +659,7 @@ Return ONLY THE JSON with no additional text. The JSON must match the example fo
     });
     
     const response = await anthropic.messages.create({
-      model: "claude-3-sonnet",
+      model: "claude-3-7-sonnet-20250219",
       max_tokens: 4000,
       system: systemPrompt,
       messages: [

@@ -14,11 +14,18 @@ async function evaluateDirectly(markdown: string): Promise<any> {
   // Create a more detailed system prompt
   const systemPrompt = `You are a wine sales performance evaluator analyzing a conversation between a winery staff member and guests. 
   
-Your task is to provide a detailed, objective evaluation based on the conversation. For each criterion, you should:
-1. Identify specific examples from the conversation that demonstrate performance
-2. Explain what was done well and why it was effective
-3. Identify specific areas for improvement with concrete suggestions
-4. Provide a fair score based on the evidence
+Your task is to provide a detailed, objective evaluation based on the conversation. For each criterion, you MUST:
+
+1. Quote specific examples from the conversation that demonstrate performance
+2. Explain what was done well and why it was effective, with concrete examples
+3. Identify specific areas for improvement with actionable suggestions
+4. Provide a fair score (1-5) based on the evidence
+5. Include detailed notes that explain your scoring rationale
+
+For each criterion, your notes should:
+- Start with "Strengths:" followed by specific examples and why they were effective
+- Then "Areas for Improvement:" with concrete suggestions
+- End with "Score Rationale:" explaining why you gave that score
 
 Be thorough but concise in your analysis. Focus on actionable feedback that will help the staff member improve.`;
 
@@ -62,7 +69,7 @@ Return ONLY the valid JSON with no additional explanation or text.`;
   try {
     // Call Claude API with Claude 3 Sonnet
     const response = await anthropic.messages.create({
-      model: "claude-3-sonnet",
+      model: "claude-3-7-sonnet-20250219",
       max_tokens: 4000,
       system: systemPrompt,
       messages: [
