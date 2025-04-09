@@ -8,6 +8,7 @@
   NODE_VERSION = "18"
   NODE_ENV = "production"
   DEBUG = "*"
+  NPM_FLAGS = "--legacy-peer-deps"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
