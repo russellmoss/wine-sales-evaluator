@@ -31,7 +31,29 @@ export class KVStorageProvider implements StorageProvider {
   private maxAge: number;
 
   constructor(maxAge: number = 24 * 60 * 60 * 1000) { // Default: 24 hours
-    this.store = getStore('wine-analysis-jobs');
+    // Check if we're in a Netlify environment
+    if (process.env.NETLIFY === 'true') {
+      // Get site ID and token from environment variables
+      const siteID = process.env.NETLIFY_SITE_ID;
+      const token = process.env.NETLIFY_ACCESS_TOKEN;
+      
+      if (!siteID || !token) {
+        console.error('Netlify Blobs configuration missing. Please set NETLIFY_SITE_ID and NETLIFY_ACCESS_TOKEN environment variables.');
+        throw new Error('Netlify Blobs configuration missing. Please set NETLIFY_SITE_ID and NETLIFY_ACCESS_TOKEN environment variables.');
+      }
+      
+      // Set environment variables for Netlify Blobs
+      process.env.NETLIFY_SITE_ID = siteID;
+      process.env.NETLIFY_ACCESS_TOKEN = token;
+      
+      // Initialize the store
+      this.store = getStore('wine-analysis-jobs');
+    } else {
+      // For local development, use a fallback or mock implementation
+      console.warn('Not in Netlify environment. Using fallback storage for local development.');
+      this.store = getStore('wine-analysis-jobs');
+    }
+    
     this.maxAge = maxAge;
   }
 
@@ -342,15 +364,21 @@ export function createStorageProvider(): StorageProvider {
   
   console.log(`Initializing ${storageType} storage provider`);
   
-  switch (storageType.toLowerCase()) {
-    case 'kv':
-      return new KVStorageProvider(maxAge);
-    case 'memory':
-      return new MemoryStorageProvider(maxAge);
-    case 'file':
-      throw new Error('File storage is not reliable in Netlify Functions, use KV store instead');
-    default:
-      return new KVStorageProvider(maxAge);
+  try {
+    switch (storageType.toLowerCase()) {
+      case 'kv':
+        return new KVStorageProvider(maxAge);
+      case 'memory':
+        return new MemoryStorageProvider(maxAge);
+      case 'file':
+        throw new Error('File storage is not reliable in Netlify Functions, use KV store instead');
+      default:
+        return new KVStorageProvider(maxAge);
+    }
+  } catch (error) {
+    console.error('Error initializing KV storage provider:', error);
+    console.log('Falling back to memory storage provider');
+    return new MemoryStorageProvider(maxAge);
   }
 }
 

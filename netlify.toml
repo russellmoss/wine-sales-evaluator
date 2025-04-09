@@ -11,6 +11,9 @@
   # Set storage type to KV
   JOB_STORAGE_TYPE = "kv"
   JOB_MAX_AGE = "86400000"
+  # Netlify Blobs configuration
+  NETLIFY_SITE_ID = "your-site-id"
+  NETLIFY_ACCESS_TOKEN = "your-access-token"
   DEBUG = "*"
   NPM_FLAGS = "--legacy-peer-deps"
 
@@ -68,6 +71,10 @@
   NODE_ENV = "development"
   NETLIFY_DEV = "true"
   DEBUG = "*"
+  # Netlify Blobs configuration for local development
+  NETLIFY_SITE_ID = "your-site-id"
+  NETLIFY_ACCESS_TOKEN = "your-access-token"
+  JOB_STORAGE_TYPE = "kv"
 
 [build.processing]
   skip_processing = false
