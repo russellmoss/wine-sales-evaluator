@@ -9,25 +9,24 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.39.0",
-    "@netlify/functions": "^3.0.4",
+    "@anthropic-ai/sdk": "^0.18.0",
+    "@netlify/functions": "^2.6.0",
     "@react-pdf/renderer": "^3.3.8",
     "next": "14.1.0",
     "react": "^18",
     "react-dom": "^18",
     "react-hot-toast": "^2.4.1",
-    "react-to-pdf": "^2.0.0",
-    "recharts": "^2.15.2"
+    "recharts": "^2.12.0"
   },
   "devDependencies": {
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
-    "autoprefixer": "^10.4.21",
+    "autoprefixer": "^10.0.1",
     "eslint": "^8",
     "eslint-config-next": "14.1.0",
-    "postcss": "^8.5.3",
-    "tailwindcss": "^3.4.17",
+    "postcss": "^8",
+    "tailwindcss": "^3.3.0",
     "typescript": "^5"
   },
   "main": "next.config.js",

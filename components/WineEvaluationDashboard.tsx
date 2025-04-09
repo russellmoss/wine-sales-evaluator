@@ -3,8 +3,9 @@
 import React, { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import type { WineEvaluation } from '@/types/evaluation';
-import MarkdownImporter from '@/components/MarkdownImporter';
-import LoadingIndicator from '@/components/LoadingIndicator';
+import MarkdownImporter from './MarkdownImporter';
+import LoadingIndicator from './LoadingIndicator';
+import { AnalysisState } from '../types/analysis';
 
 const WineEvaluationDashboard: React.FC = () => {
   const router = useRouter();
