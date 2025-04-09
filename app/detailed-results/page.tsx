@@ -2,8 +2,10 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { EvaluationData } from '@/types/evaluation';
+import type { EvaluationData } from '../../types/evaluation';
 import LoadingIndicator from '../../components/LoadingIndicator';
+import PDFExport from '../../components/PDFExport';
+import BackButton from '../../components/BackButton';
 import { 
   BarChart, 
   Bar, 
@@ -15,8 +17,6 @@ import {
   Cell
 } from 'recharts';
 import dynamic from 'next/dynamic';
-import PDFExport from '../../components/PDFExport';
-import BackButton from '../../components/BackButton';
 
 // Dynamically import PDFExport with no SSR
 const PDFExportComponent = dynamic(() => import('@/components/PDFExport'), {

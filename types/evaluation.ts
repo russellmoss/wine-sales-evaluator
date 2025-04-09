@@ -1,7 +1,7 @@
 export interface CriterionScore {
   criterion: string;
-  score: number;
   weight: number;
+  score: number;
   weightedScore: number;
   notes: string;
 }
@@ -21,7 +21,7 @@ export interface ObservationalNotes {
 export interface EvaluationData {
   staffName: string;
   date: string;
-  totalScore: number;
+  overallScore: number;
   performanceLevel: string;
   criteriaScores: CriterionScore[];
   strengths: string[];
@@ -107,7 +107,7 @@ export function createEmptyEvaluation(): EvaluationData {
   return {
     staffName: '',
     date: formatDate(new Date()),
-    totalScore: 0,
+    overallScore: 0,
     performanceLevel: 'Needs Improvement',
     criteriaScores,
     strengths: [],
