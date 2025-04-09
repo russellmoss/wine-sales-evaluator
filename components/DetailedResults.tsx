@@ -76,14 +76,14 @@ const DetailedResults: React.FC<DetailedResultsProps> = ({ evaluationData }) => 
             <div className="flex mb-2 items-center justify-between">
               <div>
                 <span className="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-blue-600 bg-blue-200">
-                  {evaluationData.totalScore}%
+                  {evaluationData.overallScore}%
                 </span>
               </div>
             </div>
             <div className="overflow-hidden h-2 mb-4 text-xs flex rounded bg-blue-200">
               <div
-                style={{ width: `${evaluationData.totalScore}%` }}
-                className={`shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center ${getScoreColor(evaluationData.totalScore / 20)}`}
+                style={{ width: `${evaluationData.overallScore}%` }}
+                className={`shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center ${getScoreColor(evaluationData.overallScore / 20)}`}
               />
             </div>
           </div>

@@ -39,7 +39,10 @@ const PDFExportView: React.FC<PDFExportViewProps> = ({ evaluation }) => {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <p className="text-gray-600">Overall Score</p>
-              <p className="text-2xl font-bold">{evaluation.totalScore}/5</p>
+              <div className="flex items-center justify-between">
+                <p className="text-2xl font-bold">{evaluation.overallScore}/5</p>
+                <p className="text-2xl font-bold">{evaluation.performanceLevel}</p>
+              </div>
             </div>
             <div>
               <p className="text-gray-600">Performance Level</p>

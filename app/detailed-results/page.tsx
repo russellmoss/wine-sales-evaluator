@@ -58,7 +58,7 @@ export default function DetailedResultsPage() {
       const parsedData = JSON.parse(storedData);
       
       // Validate the data structure
-      if (!parsedData.staffName || !parsedData.date || !parsedData.totalScore || !parsedData.criteriaScores) {
+      if (!parsedData.staffName || !parsedData.date || !parsedData.overallScore || !parsedData.criteriaScores) {
         console.error('Invalid evaluation data structure:', parsedData);
         setError('Invalid evaluation data structure. Please upload a conversation again.');
         setLoading(false);

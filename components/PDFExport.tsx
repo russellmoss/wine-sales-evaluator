@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Document, Page, Text, View, StyleSheet, PDFViewer, pdf, PDFDownloadLink } from '@react-pdf/renderer';
+import { Document, Page, Text, View, StyleSheet, PDFViewer, pdf, PDFDownloadLink as ReactPDFDownloadLink, PDFDownloadLinkProps, BlobProvider } from '@react-pdf/renderer';
 import type { EvaluationData } from '@/types/evaluation';
 import LoadingIndicator from './LoadingIndicator';
 import { toast } from 'react-hot-toast';
@@ -215,7 +215,7 @@ const PDFDocument: React.FC<{ evaluationData: EvaluationData }> = ({ evaluationD
             </View>
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>Overall Score:</Text>
-              <Text style={styles.summaryValue}>{evaluationData.totalScore}/5</Text>
+              <Text style={styles.summaryValue}>{evaluationData.overallScore}/5</Text>
             </View>
           </View>
         </View>
@@ -344,55 +344,38 @@ const PDFExport: React.FC<PDFExportProps> = ({ evaluationData, onClose, fileName
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white p-4 rounded-lg shadow-xl w-11/12 h-5/6 flex flex-col">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold">Export Evaluation as PDF</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700"
-          >
-            ✕
+          <h2 className="text-2xl font-bold">Export Evaluation</h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
         </div>
         
-        <div className="flex-1 overflow-hidden">
-          <PDFDownloadLink
-            document={<PDFDocument evaluationData={evaluationData} />}
-            fileName={fileName}
-            onClick={handleExport}
-          >
-            {({ blob, url, loading, error }) => (
-              <button
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-500 flex items-center"
-                disabled={loading || !evaluationData}
-              >
-                {loading ? (
-                  <>
-                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Generating PDF...
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                    </svg>
-                    Export PDF
-                  </>
-                )}
-              </button>
-            )}
-          </PDFDownloadLink>
+        <div className="mb-4">
+          <BlobProvider document={<PDFDocument evaluationData={evaluationData} />}>
+            {({ blob, url, loading, error }) => {
+              if (loading) return <div>Loading document...</div>;
+              if (error) return <div>Error: {error instanceof Error ? error.message : 'Unknown error'}</div>;
+              if (!blob || !url) return null;
+              
+              return (
+                <a href={url} download={fileName} className="btn btn-primary">
+                  Download PDF
+                </a>
+              );
+            }}
+          </BlobProvider>
         </div>
         
-        {error && (
-          <div className="mt-2 text-red-500 text-sm">
-            Error generating PDF: {error.message}
-          </div>
-        )}
+        <div className="mt-4">
+          <button onClick={onClose} className="btn btn-secondary">
+            Close
+          </button>
+        </div>
       </div>
     </div>
   );
