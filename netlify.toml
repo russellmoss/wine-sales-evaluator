@@ -1,14 +1,13 @@
 [build]
-  command = "npm run build"
-  publish = "out"
+  command = "npm install --production=false && npm run build"
+  publish = ".next"
   functions = "netlify/functions"
 
 [build.environment]
   NEXT_TELEMETRY_DISABLED = "1"
+  NODE_VERSION = "18"
   NODE_ENV = "production"
-  CLAUDE_API_KEY = ""
-  NEXT_PUBLIC_CLAUDE_API_KEY = ""
-  NPM_FLAGS = "--legacy-peer-deps"
+  DEBUG = "*"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
@@ -21,15 +20,11 @@
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
-  external_node_modules = ["@anthropic-ai/sdk", "@netlify/functions"]
-  included_files = ["public/data/**"]
-
-[functions.timeout]
-  external_node_modules = ["@anthropic-ai/sdk", "@netlify/functions"]
+  external_node_modules = ["@anthropic-ai/sdk"]
 
 [functions.analyze-conversation]
-  included_files = ["public/data/**"]
-  timeout = "60"
+  included_files = ["public/data/wines_sales_rubric.md", "public/data/evaluation_new.json"]
+  timeout = 60
 
 [dev]
   command = "npm run dev"
