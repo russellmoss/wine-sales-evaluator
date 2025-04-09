@@ -1,4 +1,4 @@
-import { Handler } from '@netlify/functions/dist/function/handler';
+import { Handler } from '@netlify/functions';
 import { Anthropic } from '@anthropic-ai/sdk';
 import fs from 'fs';
 import path from 'path';
