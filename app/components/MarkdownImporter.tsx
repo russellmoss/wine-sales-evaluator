@@ -2,9 +2,11 @@
 
 import React, { useState, useRef } from 'react';
 import { toast } from 'react-hot-toast';
+import { validateEvaluationData } from '../utils/validation';
+import { EvaluationData } from '../types/evaluation';
 
 interface MarkdownImporterProps {
-  onAnalysisComplete: (evaluationData: any) => void;
+  onAnalysisComplete: (evaluationData: EvaluationData) => void;
   isAnalyzing: boolean;
   setIsAnalyzing: (value: boolean) => void;
 }
@@ -58,39 +60,62 @@ const MarkdownImporter: React.FC<MarkdownImporterProps> = ({
         throw new Error(errorData.message || `Error: ${response.status}`);
       }
       
-      const evaluationData = await response.json();
+      let responseData = await response.json();
       
-      // Validate that the response has the expected structure
-      if (!evaluationData.staffName || !evaluationData.criteriaScores) {
-        throw new Error('The evaluation data returned does not have the expected format');
+      // Check if we got a job ID (for async processing)
+      if (responseData.jobId) {
+        toast.success('Analysis started. Waiting for results...');
+        
+        // Poll for job status
+        const jobId = responseData.jobId;
+        let jobCompleted = false;
+        let attempts = 0;
+        const maxAttempts = 60; // 5 minutes at 5 second intervals
+        
+        while (!jobCompleted && attempts < maxAttempts) {
+          attempts++;
+          await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
+          
+          const statusResponse = await fetch(`/api/analyze-conversation?jobId=${jobId}`);
+          if (!statusResponse.ok) {
+            console.error(`Error checking job status: ${statusResponse.status}`);
+            continue;
+          }
+          
+          const statusData = await statusResponse.json();
+          
+          if (statusData.status === 'completed') {
+            responseData = statusData.result;
+            jobCompleted = true;
+          } else if (statusData.status === 'failed') {
+            throw new Error(statusData.error || 'Job processing failed');
+          }
+          
+          // Update toast with progress
+          toast.loading(`Analysis in progress (${attempts}/60)...`, {id: 'analysis-progress'});
+        }
+        
+        if (!jobCompleted) {
+          throw new Error('Analysis timed out. Please try again.');
+        }
       }
       
-      // Handle both overallScore and totalScore fields
-      if (evaluationData.totalScore !== undefined) {
-        evaluationData.overallScore = evaluationData.totalScore;
-      } else if (evaluationData.overallScore === undefined) {
-        // Calculate overallScore from criteriaScores if neither field is present
-        const totalWeightedScore = evaluationData.criteriaScores.reduce((sum: number, criterion: any) => {
-          return sum + (criterion.weightedScore || 0);
-        }, 0);
-        evaluationData.overallScore = Math.round(totalWeightedScore / 5);
+      // Log the full structure for debugging
+      console.log('Response data structure:', JSON.stringify(responseData, null, 2));
+      
+      // Use the shared validation utility
+      const validationResult = validateEvaluationData(responseData, markdown, fileName);
+      
+      // Log validation errors if any
+      if (!validationResult.isValid) {
+        console.warn('Validation errors:', validationResult.errors);
+        
+        // Show a warning toast with the number of validation issues
+        toast.error(`Data had ${validationResult.errors.length} validation issues that were automatically fixed.`);
       }
       
-      // Ensure overallScore is a number
-      if (typeof evaluationData.overallScore === 'string') {
-        evaluationData.overallScore = parseFloat(evaluationData.overallScore);
-      }
-      
-      if (typeof evaluationData.overallScore !== 'number' || isNaN(evaluationData.overallScore)) {
-        throw new Error('The evaluation data returned does not have a valid overallScore');
-      }
-      
-      // Ensure the score is a percentage (0-100)
-      if (evaluationData.overallScore > 100) {
-        evaluationData.overallScore = Math.round((evaluationData.overallScore / 500) * 100);
-      }
-      
-      onAnalysisComplete(evaluationData);
+      // Pass the validated data to the parent component
+      onAnalysisComplete(validationResult.data);
       toast.success('Conversation analyzed successfully!');
       
       // Reset the form

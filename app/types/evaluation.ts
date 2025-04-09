@@ -1,40 +1,44 @@
 // Types for evaluation criteria scores
 export interface CriterionScore {
-  criterion: string;
-  weight: number;
-  score: number;
-  weightedScore: number;
-  notes: string;
+  criterion: string;  // Name of the criterion being evaluated
+  weight: number;     // Weight of the criterion (1-10)
+  score: number;      // Score given (1-5)
+  weightedScore: number; // Calculated as score * weight
+  notes: string;      // Detailed notes about the score
 }
 
 // Types for observational notes (unweighted criteria)
 export interface ObservationalNote {
-  score: number;
-  notes: string;
+  score: number;      // Score given (1-5)
+  notes: string;      // Detailed notes about the observation
 }
 
 export interface ObservationalNotes {
-  productKnowledge: ObservationalNote;
-  handlingObjections: ObservationalNote;
+  productKnowledge: ObservationalNote;    // Evaluation of product knowledge
+  handlingObjections: ObservationalNote;   // Evaluation of objection handling
 }
+
+// Performance level type - must be one of these exact values
+export type PerformanceLevel = 'Exceptional' | 'Strong' | 'Proficient' | 'Developing' | 'Needs Improvement';
 
 // Main evaluation data interface
 export interface EvaluationData {
-  staffName: string;
-  date: string;
-  overallScore: number;
-  performanceLevel: PerformanceLevel;
-  criteriaScores: CriterionScore[];
-  observationalNotes: ObservationalNotes;
-  strengths: string[];
-  areasForImprovement: string[];
-  keyRecommendations: string[];
+  // Required fields
+  staffName: string;                // Name of the staff member being evaluated
+  date: string;                     // Date of the evaluation (YYYY-MM-DD format)
+  overallScore: number;             // Overall score as a percentage (0-100)
+  performanceLevel: PerformanceLevel; // Performance level based on overall score
+  criteriaScores: CriterionScore[]; // Array of exactly 10 criterion scores
+  observationalNotes: ObservationalNotes; // Observational notes for unweighted criteria
+  strengths: string[];              // Array of exactly 3 strengths
+  areasForImprovement: string[];    // Array of exactly 3 areas for improvement
+  keyRecommendations: string[];     // Array of exactly 3 key recommendations
+  
+  // Optional fields
+  totalScore?: number;              // Alternative field for overallScore (will be converted)
 }
 
-// Performance level type
-export type PerformanceLevel = 'Exceptional' | 'Strong' | 'Proficient' | 'Developing' | 'Needs Improvement';
-
-// Criteria weights
+// Criteria weights - must total 100
 export const CRITERIA_WEIGHTS = {
   'Initial Greeting and Welcome': 8,
   'Building Rapport': 10,
@@ -82,46 +86,53 @@ export function calculateTotalScore(criteriaScores: CriterionScore[]): number {
 // Helper function to validate evaluation data
 export function validateEvaluationData(data: EvaluationData): boolean {
   try {
-    // Check required fields exist
-    if (!data.staffName || !data.date || data.overallScore === undefined || !data.performanceLevel) {
-      return false;
+    // Allow for either overallScore or totalScore
+    if (data.totalScore !== undefined && data.overallScore === undefined) {
+      data.overallScore = data.totalScore;
+      delete data.totalScore; // Clean up to avoid confusion
     }
-
+    
+    // Convert string scores to numbers if needed
+    if (typeof data.overallScore === 'string') {
+      data.overallScore = parseFloat(data.overallScore);
+    }
+    
+    // Ensure score is in percentage form (0-100)
+    if (data.overallScore > 100) {
+      data.overallScore = Math.round((data.overallScore / 500) * 100);
+    }
+    
+    // Validate required fields
+    if (!data.staffName) return false;
+    if (!data.date) return false;
+    if (typeof data.overallScore !== 'number' || isNaN(data.overallScore)) return false;
+    if (!data.performanceLevel) return false;
+    
     // Validate criteria scores
-    if (!Array.isArray(data.criteriaScores) || data.criteriaScores.length !== 10) {
-      return false;
+    if (!Array.isArray(data.criteriaScores) || data.criteriaScores.length !== 10) return false;
+    
+    // Validate each criteria score
+    for (const score of data.criteriaScores) {
+      if (!score.criterion) return false;
+      if (typeof score.weight !== 'number' || isNaN(score.weight)) return false;
+      if (typeof score.score !== 'number' || isNaN(score.score)) return false;
+      if (typeof score.weightedScore !== 'number' || isNaN(score.weightedScore)) return false;
+      if (!score.notes) return false;
     }
-
-    // Validate weights match defined criteria
-    const hasValidWeights = data.criteriaScores.every(score => 
-      CRITERIA_WEIGHTS[score.criterion as keyof typeof CRITERIA_WEIGHTS] === score.weight
-    );
-    if (!hasValidWeights) return false;
-
-    // Validate scores are within range
-    const hasValidScores = data.criteriaScores.every(score => 
-      score.score >= 1 && score.score <= 5
-    );
-    if (!hasValidScores) return false;
-
-    // Validate weighted scores are calculated correctly
-    const hasValidWeightedScores = data.criteriaScores.every(score => 
-      score.weightedScore === calculateWeightedScore(score.score, score.weight)
-    );
-    if (!hasValidWeightedScores) return false;
-
-    // Validate arrays have required elements
-    if (!data.strengths.length || !data.areasForImprovement.length || !data.keyRecommendations.length) {
-      return false;
-    }
-
+    
     // Validate observational notes
-    if (!data.observationalNotes?.productKnowledge || !data.observationalNotes?.handlingObjections) {
-      return false;
-    }
-
+    if (!data.observationalNotes) return false;
+    if (!data.observationalNotes.productKnowledge) return false;
+    if (!data.observationalNotes.handlingObjections) return false;
+    
+    // Validate arrays
+    if (!Array.isArray(data.strengths) || data.strengths.length !== 3) return false;
+    if (!Array.isArray(data.areasForImprovement) || data.areasForImprovement.length !== 3) return false;
+    if (!Array.isArray(data.keyRecommendations) || data.keyRecommendations.length !== 3) return false;
+    
     return true;
   } catch (error) {
+    console.error('Error validating evaluation data:', error);
     return false;
   }
 }

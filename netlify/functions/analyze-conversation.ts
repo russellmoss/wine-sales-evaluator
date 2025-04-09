@@ -1,59 +1,22 @@
 import { Handler, HandlerEvent, HandlerContext } from '@netlify/functions';
-import fs from 'fs';
-import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
-
-// Define the job status interface
-interface JobStatus {
-  id: string;
-  status: 'pending' | 'processing' | 'completed' | 'failed';
-  result?: any;
-  error?: string;
-  createdAt: number;
-  updatedAt: number;
-}
-
-// Define the path to the jobs directory
-const JOBS_DIR = '/tmp/jobs';
-
-// Ensure the jobs directory exists
-const ensureJobsDir = () => {
-  if (!fs.existsSync(JOBS_DIR)) {
-    fs.mkdirSync(JOBS_DIR, { recursive: true });
-  }
-};
-
-// Save a job to the filesystem
-const saveJob = (job: JobStatus) => {
-  ensureJobsDir();
-  const jobPath = path.join(JOBS_DIR, `${job.id}.json`);
-  fs.writeFileSync(jobPath, JSON.stringify(job, null, 2));
-};
-
-// Get a job by ID
-const getJob = (jobId: string): JobStatus | null => {
-  ensureJobsDir();
-  const jobPath = path.join(JOBS_DIR, `${jobId}.json`);
-  
-  if (!fs.existsSync(jobPath)) {
-    return null;
-  }
-  
-  try {
-    const jobData = fs.readFileSync(jobPath, 'utf8');
-    return JSON.parse(jobData) as JobStatus;
-  } catch (error) {
-    console.error(`Error reading job ${jobId}:`, error);
-    return null;
-  }
-};
+import { getStorageProvider, createJob, JobStatus } from '../../app/utils/storage';
 
 export const handler: Handler = async (event: HandlerEvent, context: HandlerContext) => {
-  console.log('Main function: Handler started');
+  console.log('Main function: Handler started', {
+    httpMethod: event.httpMethod,
+    pathPattern: event.path,
+    hasBody: !!event.body,
+    contentLength: event.body?.length
+  });
   
-  // Handle GET requests for checking job status
+  // Get the storage provider
+  const storage = getStorageProvider();
+  
+  // For GET requests checking job status, add detailed logging
   if (event.httpMethod === 'GET') {
     const jobId = event.queryStringParameters?.jobId;
+    console.log(`Main function: Checking status for job ${jobId || 'unknown'}`);
     
     if (!jobId) {
       return {
@@ -62,117 +25,141 @@ export const handler: Handler = async (event: HandlerEvent, context: HandlerCont
       };
     }
     
-    console.log(`Main function: Checking status for job ${jobId}`);
-    const job = getJob(jobId);
-    
-    if (!job) {
-      return {
-        statusCode: 404,
-        body: JSON.stringify({ error: 'Job not found' })
-      };
-    }
-    
-    return {
-      statusCode: 200,
-      body: JSON.stringify({
-        id: job.id,
-        status: job.status,
-        result: job.result,
-        error: job.error,
-        createdAt: job.createdAt,
-        updatedAt: job.updatedAt
-      })
-    };
-  }
-  
-  // Handle POST requests for creating new jobs
-  if (event.httpMethod !== 'POST') {
-    return {
-      statusCode: 405,
-      body: JSON.stringify({ error: 'Method not allowed' })
-    };
-  }
-  
-  try {
-    if (!event.body) {
-      return {
-        statusCode: 400,
-        body: JSON.stringify({ error: 'No request body provided' })
-      };
-    }
-    
-    const { markdown, fileName } = JSON.parse(event.body);
-    
-    if (!markdown) {
-      return {
-        statusCode: 400,
-        body: JSON.stringify({ error: 'No markdown content provided' })
-      };
-    }
-    
-    // Create a new job
-    const job: JobStatus = {
-      id: uuidv4(),
-      status: 'pending' as const,
-      createdAt: Date.now(),
-      updatedAt: Date.now()
-    };
-    saveJob(job);
-    console.log(`Main function: Created new job ${job.id}`);
-    
-    // Trigger the background processing
     try {
-      // Use the Netlify function URL for the background processing
-      const netlifyUrl = process.env.URL || 'http://localhost:8888';
-      const backgroundFunctionUrl = `${netlifyUrl}/.netlify/functions/analyze-conversation-background`;
-      
-      console.log(`Main function: Calling background function at ${backgroundFunctionUrl}`);
-      
-      const response = await fetch(backgroundFunctionUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          jobId: job.id,
-          markdown,
-          fileName
-        })
+      const job = await storage.getJob(jobId);
+      console.log(`Main function: Job status:`, {
+        found: !!job,
+        status: job?.status,
+        hasError: !!job?.error,
+        hasResult: !!job?.result,
+        createdAt: job?.createdAt ? new Date(job.createdAt).toISOString() : null,
+        elapsedTime: job ? (Date.now() - job.createdAt) : null
       });
       
-      if (!response.ok) {
-        throw new Error(`Background function returned ${response.status}`);
+      // Add additional logging for completed jobs
+      if (job?.status === 'completed' && job?.result) {
+        console.log('Main function: Job result structure:', {
+          hasStaffName: !!job.result.staffName,
+          hasDate: !!job.result.date,
+          hasOverallScore: !!job.result.overallScore,
+          hasTotalScore: !!job.result.totalScore,
+          criteriaCount: Array.isArray(job.result.criteriaScores) ? job.result.criteriaScores.length : 0,
+          strengthsCount: Array.isArray(job.result.strengths) ? job.result.strengths.length : 0
+        });
       }
       
-      console.log(`Main function: Background processing started for job ${job.id}`);
+      if (!job) {
+        return {
+          statusCode: 404,
+          body: JSON.stringify({ error: 'Job not found' })
+        };
+      }
       
-      // Return the job ID to the client
       return {
-        statusCode: 202,
-        body: JSON.stringify({
-          message: 'Job created successfully',
-          jobId: job.id
-        })
+        statusCode: 200,
+        body: JSON.stringify(job)
       };
     } catch (error) {
-      console.error('Main function: Error starting background processing:', error);
-      
-      // Update job status to failed
-      job.status = 'failed' as const;
-      job.error = error instanceof Error ? error.message : 'Failed to start background processing';
-      job.updatedAt = Date.now();
-      saveJob(job);
-      
-      throw error;
+      console.error('Main function: Error retrieving job:', error);
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ error: 'Failed to retrieve job status' })
+      };
     }
-  } catch (error) {
-    console.error('Main function: Error:', error);
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ 
-        error: 'Internal server error',
-        message: error instanceof Error ? error.message : 'Unknown error'
-      })
-    };
   }
+  
+  // For POST requests starting a new job
+  if (event.httpMethod === 'POST') {
+    try {
+      if (!event.body) {
+        return {
+          statusCode: 400,
+          body: JSON.stringify({ error: 'No request body provided' })
+        };
+      }
+      
+      const { markdown, fileName } = JSON.parse(event.body);
+      
+      if (!markdown) {
+        return {
+          statusCode: 400,
+          body: JSON.stringify({ error: 'No markdown content provided' })
+        };
+      }
+      
+      // Create a new job
+      const job = createJob();
+      
+      try {
+        await storage.saveJob(job);
+        console.log(`Main function: Created new job ${job.id} for file ${fileName || 'unnamed'}`);
+      } catch (storageError) {
+        console.error('Main function: Error saving job:', storageError);
+        return {
+          statusCode: 500,
+          body: JSON.stringify({ error: 'Failed to create job' })
+        };
+      }
+      
+      // Start the background job
+      try {
+        const response = await fetch(`${process.env.NETLIFY_DEV_URL || ''}/.netlify/functions/analyze-conversation-background`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            jobId: job.id,
+            markdown,
+            fileName
+          })
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`Main function: Background job failed to start: ${errorText}`);
+          
+          job.status = 'failed';
+          job.error = `Failed to start background job: ${errorText}`;
+          job.updatedAt = Date.now();
+          await storage.saveJob(job);
+          
+          return {
+            statusCode: 500,
+            body: JSON.stringify({ error: 'Failed to start background job' })
+          };
+        }
+        
+        console.log(`Main function: Background job started for ${job.id}`);
+        
+        return {
+          statusCode: 202,
+          body: JSON.stringify({ jobId: job.id })
+        };
+      } catch (error) {
+        console.error(`Main function: Error starting background job:`, error);
+        
+        job.status = 'failed';
+        job.error = error instanceof Error ? error.message : 'Unknown error';
+        job.updatedAt = Date.now();
+        await storage.saveJob(job);
+        
+        return {
+          statusCode: 500,
+          body: JSON.stringify({ error: 'Failed to start background job' })
+        };
+      }
+    } catch (error) {
+      console.error('Main function: Error processing request:', error);
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ error: 'Internal server error' })
+      };
+    }
+  }
+  
+  return {
+    statusCode: 405,
+    body: JSON.stringify({ error: 'Method not allowed' })
+  };
 }; 
