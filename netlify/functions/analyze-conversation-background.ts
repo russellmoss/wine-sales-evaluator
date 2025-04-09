@@ -277,15 +277,15 @@ Instructions:
 Conversation to evaluate:
 ${truncatedMarkdown}
 
-Return ONLY THE JSON with no additional text.`;
+Return ONLY THE JSON with no additional text. The JSON must match the example format exactly.`;
     
     console.log('Background function: Calling Claude API');
     console.log(`Background function: Prompt size: ${userPrompt.length} characters`);
     
     // Call Claude API with streaming
     const stream = await anthropic.messages.create({
-      model: "claude-3-haiku-20240307", // Using Haiku instead of Opus for faster processing
-      max_tokens: 2000, // Reduced from 3000
+      model: "claude-3-sonnet-20240229", // Using Sonnet for better JSON formatting
+      max_tokens: 4000, // Increased token limit for complete responses
       system: systemPrompt,
       messages: [
         {
@@ -293,7 +293,7 @@ Return ONLY THE JSON with no additional text.`;
           content: userPrompt
         }
       ],
-      temperature: 0.2,
+      temperature: 0.1, // Lower temperature for more consistent JSON formatting
       stream: true // Enable streaming
     });
     
@@ -379,7 +379,7 @@ Return ONLY THE JSON with no additional text.`;
       }
       
       // Validate each criteria score entry
-      evaluationData.criteriaScores.forEach((score: CriteriaScore, index: number) => {
+      evaluationData.criteriaScores.forEach((score, index) => {
         const requiredScoreFields = ['criterion', 'weight', 'score', 'weightedScore', 'notes'];
         const missingScoreFields = requiredScoreFields.filter(field => !score[field as keyof CriteriaScore]);
         if (missingScoreFields.length > 0) {
