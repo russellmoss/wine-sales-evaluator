@@ -3,20 +3,26 @@
 import React, { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import type { WineEvaluation } from '@/types/evaluation';
+import type { AnalysisState } from '@/types/analysis';
 import MarkdownImporter from './MarkdownImporter';
 import LoadingIndicator from './LoadingIndicator';
-import { AnalysisState } from '../types/analysis';
 
 const WineEvaluationDashboard: React.FC = () => {
   const router = useRouter();
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [evaluationData, setEvaluationData] = useState<WineEvaluation | null>(null);
+  const [analysisState, setAnalysisState] = useState<AnalysisState>({
+    isAnalyzing: false,
+    error: null,
+    evaluationData: null
+  });
 
   const handleAnalysisComplete = useCallback(async (data: WineEvaluation) => {
     try {
       // Set the evaluation data
-      setEvaluationData(data);
+      setAnalysisState(prev => ({
+        ...prev,
+        evaluationData: data,
+        error: null
+      }));
       
       // Store the data in localStorage
       localStorage.setItem('wineEvaluationData', JSON.stringify(data));
@@ -31,9 +37,19 @@ const WineEvaluationDashboard: React.FC = () => {
       router.push('/detailed-results');
     } catch (err) {
       console.error('Error handling analysis completion:', err);
-      setError(err instanceof Error ? err.message : 'Failed to process evaluation data');
+      setAnalysisState(prev => ({
+        ...prev,
+        error: err instanceof Error ? err.message : 'Failed to process evaluation data'
+      }));
     }
   }, [router]);
+
+  const setIsAnalyzing = useCallback((value: boolean) => {
+    setAnalysisState(prev => ({
+      ...prev,
+      isAnalyzing: value
+    }));
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -48,22 +64,22 @@ const WineEvaluationDashboard: React.FC = () => {
         </div>
 
         <div className="bg-white rounded-lg shadow-lg p-8">
-          {isAnalyzing ? (
+          {analysisState.isAnalyzing ? (
             <div className="flex flex-col items-center justify-center py-12">
               <LoadingIndicator message="Analyzing conversation with Claude..." />
               <p className="mt-4 text-gray-600">This may take a few moments...</p>
             </div>
           ) : (
             <MarkdownImporter
-              onEvaluationData={handleAnalysisComplete}
-              isAnalyzing={isAnalyzing}
+              onAnalysisComplete={handleAnalysisComplete}
+              isAnalyzing={analysisState.isAnalyzing}
               setIsAnalyzing={setIsAnalyzing}
             />
           )}
 
-          {error && (
+          {analysisState.error && (
             <div className="mt-4 p-4 bg-red-50 text-red-700 rounded-lg">
-              {error}
+              {analysisState.error}
             </div>
           )}
         </div>
