@@ -211,6 +211,7 @@ interface EvaluationData {
   staffName: string;
   date: string;
   overallScore: number;
+  totalScore?: number; // Optional field that might be used instead of overallScore
   performanceLevel: string;
   criteriaScores: CriteriaScore[];
   strengths: string[];
@@ -333,12 +334,31 @@ Return ONLY THE JSON with no additional text.`;
       
       console.log('Background function: Validating JSON structure');
       // Validate the structure of the received JSON
-      const requiredFields = ['staffName', 'date', 'overallScore', 'performanceLevel', 
+      const requiredFields = ['staffName', 'date', 'performanceLevel', 
                              'criteriaScores', 'strengths', 'areasForImprovement', 'keyRecommendations'];
       
       const missingFields = requiredFields.filter(field => !evaluationData[field as keyof EvaluationData]);
       if (missingFields.length > 0) {
         throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
+      }
+      
+      // Handle both overallScore and totalScore fields
+      if (!evaluationData.overallScore && evaluationData.totalScore !== undefined) {
+        console.log('Background function: Using totalScore as overallScore');
+        evaluationData.overallScore = evaluationData.totalScore;
+      }
+      
+      // Ensure overallScore is a number
+      if (typeof evaluationData.overallScore === 'string') {
+        console.log('Background function: Converting overallScore from string to number');
+        evaluationData.overallScore = parseFloat(evaluationData.overallScore);
+        if (isNaN(evaluationData.overallScore)) {
+          throw new Error('overallScore could not be converted to a number');
+        }
+      }
+      
+      if (typeof evaluationData.overallScore !== 'number') {
+        throw new Error('overallScore must be a number');
       }
       
       // Ensure criteriaScores is properly formatted
@@ -357,16 +377,29 @@ Return ONLY THE JSON with no additional text.`;
         if (missingScoreFields.length > 0) {
           throw new Error(`Criteria score ${index + 1} missing fields: ${missingScoreFields.join(', ')}`);
         }
-      });
-      
-      // Convert overallScore to a number if it's a string
-      if (typeof evaluationData.overallScore === 'string') {
-        console.log('Background function: Converting overallScore from string to number');
-        evaluationData.overallScore = parseFloat(evaluationData.overallScore);
-        if (isNaN(evaluationData.overallScore)) {
-          throw new Error('overallScore could not be converted to a number');
+        
+        // Ensure numeric fields are actually numbers
+        if (typeof score.weight !== 'number') {
+          score.weight = parseFloat(score.weight as any);
+          if (isNaN(score.weight)) {
+            throw new Error(`Criteria score ${index + 1} weight must be a number`);
+          }
         }
-      }
+        
+        if (typeof score.score !== 'number') {
+          score.score = parseFloat(score.score as any);
+          if (isNaN(score.score)) {
+            throw new Error(`Criteria score ${index + 1} score must be a number`);
+          }
+        }
+        
+        if (typeof score.weightedScore !== 'number') {
+          score.weightedScore = parseFloat(score.weightedScore as any);
+          if (isNaN(score.weightedScore)) {
+            throw new Error(`Criteria score ${index + 1} weightedScore must be a number`);
+          }
+        }
+      });
       
       // Ensure arrays have exactly 3 items
       ['strengths', 'areasForImprovement', 'keyRecommendations'].forEach(field => {
