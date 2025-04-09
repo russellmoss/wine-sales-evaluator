@@ -1,21 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { WineEvaluation } from './types/evaluation';
-
-interface CriterionScore {
-  Criterion: string;
-  Weight: number;
-  Score: number;
-  'Weighted Score': number;
-}
+import { WineEvaluation, CriterionScore } from '@/types/evaluation';
 
 interface DemoData {
   final_score: number;
   performance_level: string;
   criteria_scores: CriterionScore[];
   strengths: string[];
-  improvements: string[];
-  recommendations: string[];
+  areasForImprovement: string[];
+  keyRecommendations: string[];
   detailed_notes: Record<string, string>;
 }
 
@@ -29,46 +22,46 @@ const WineEvaluationDashboard: React.FC = () => {
     
     // Simulated evaluation results
     const demoData: DemoData = {
-      final_score: 78.4,
-      performance_level: "Proficient",
+      final_score: 85,
+      performance_level: "Strong",
       criteria_scores: [
-        { Criterion: "Initial Greeting and Welcome", Weight: 8, Score: 2, "Weighted Score": 16 },
-        { Criterion: "Building Rapport", Weight: 10, Score: 3, "Weighted Score": 30 },
-        { Criterion: "Winery History and Ethos", Weight: 10, Score: 3, "Weighted Score": 30 },
-        { Criterion: "Storytelling and Analogies", Weight: 10, Score: 3, "Weighted Score": 30 },
-        { Criterion: "Recognition of Buying Signals", Weight: 12, Score: 4, "Weighted Score": 48 },
-        { Criterion: "Customer Data Capture", Weight: 8, Score: 4, "Weighted Score": 32 },
-        { Criterion: "Asking for the Sale", Weight: 12, Score: 4, "Weighted Score": 48 },
-        { Criterion: "Personalized Wine Recommendations", Weight: 10, Score: 3, "Weighted Score": 30 },
-        { Criterion: "Wine Club Presentation", Weight: 12, Score: 5, "Weighted Score": 60 },
-        { Criterion: "Closing Interaction", Weight: 8, Score: 4, "Weighted Score": 32 }
+        { criterion: "Initial Greeting", weight: 1.0, score: 4, weightedScore: 4.0, notes: "Warm and professional greeting" },
+        { criterion: "Building Rapport", weight: 1.2, score: 4, weightedScore: 4.8, notes: "Good use of open-ended questions" },
+        { criterion: "Wine Knowledge", weight: 1.5, score: 5, weightedScore: 7.5, notes: "Excellent knowledge of wine characteristics" },
+        { criterion: "Tasting Experience", weight: 1.3, score: 4, weightedScore: 5.2, notes: "Well-structured tasting experience" },
+        { criterion: "Food Pairing", weight: 1.1, score: 4, weightedScore: 4.4, notes: "Good suggestions for food pairings" },
+        { criterion: "Sales Techniques", weight: 1.4, score: 4, weightedScore: 5.6, notes: "Effective use of suggestive selling" },
+        { criterion: "Closing", weight: 1.0, score: 4, weightedScore: 4.0, notes: "Clear and professional closing" },
+        { criterion: "Follow-up", weight: 0.9, score: 3, weightedScore: 2.7, notes: "Could improve follow-up suggestions" },
+        { criterion: "Problem Solving", weight: 1.2, score: 4, weightedScore: 4.8, notes: "Good handling of customer concerns" },
+        { criterion: "Buying Signals", weight: 1.3, score: 4, weightedScore: 5.2, notes: "Good recognition of buying signals" }
       ],
       strengths: [
         "Strong wine club presentation with clear benefits and personalization",
         "Effective customer data capture with clear value propositions",
         "Good recognition of buying signals with appropriate responses"
       ],
-      improvements: [
+      areasForImprovement: [
         "Enhance the initial greeting with more warmth and enthusiasm",
         "Build rapport earlier in the interaction and ask more follow-up questions",
         "Develop more vivid analogies and stories to make wines memorable"
       ],
-      recommendations: [
+      keyRecommendations: [
         "Create a script for greeting and closing to ensure consistent, warm interactions",
         "Practice active listening and asking open-ended questions to build stronger connections",
         "Develop a personal storytelling approach that connects wines to the winery's history and values"
       ],
       detailed_notes: {
-        "Initial Greeting and Welcome": "Introduced himself but the greeting was very casual with minimal warmth. Did not set an enthusiastic tone for the experience.",
-        "Building Rapport": "Asked where guests were from, but this was delayed until midway through the tasting. Limited personal connection.",
-        "Winery History and Ethos": "Explained winemaking philosophy briefly but referred guests to the menu for history rather than sharing it personally.",
-        "Storytelling and Analogies": "Used some storytelling elements about wines but lacked rich analogies or memorable descriptions.",
-        "Recognition of Buying Signals": "Recognized enthusiasm for the Brut Cuvée and offered to set aside a bottle. Also stepped up when guests showed interest in taking wine home.",
-        "Customer Data Capture": "Good data capture through wine club signup and QR code contest entry. Provided clear reasons for data collection.",
-        "Asking for the Sale": "Clear, direct asks for both wine club signup and bottle purchases. Good transition from tasting to sales.",
-        "Personalized Wine Recommendations": "Adequate recommendations with some food pairing suggestions, but limited customization based on guest feedback.",
-        "Wine Club Presentation": "Excellent presentation of wine club benefits, tiers, and personalized invitation to join. Connected geographic location to club value.",
-        "Closing Interaction": "Warm thank you with specific mention of looking forward to seeing guests at future events. Good reinforcement of relationship."
+        "Initial Greeting": "Warm and professional greeting",
+        "Building Rapport": "Good use of open-ended questions",
+        "Wine Knowledge": "Excellent knowledge of wine characteristics",
+        "Tasting Experience": "Well-structured tasting experience",
+        "Food Pairing": "Good suggestions for food pairings",
+        "Sales Techniques": "Effective use of suggestive selling",
+        "Closing": "Clear and professional closing",
+        "Follow-up": "Could improve follow-up suggestions",
+        "Problem Solving": "Good handling of customer concerns",
+        "Buying Signals": "Good recognition of buying signals"
       }
     };
     
@@ -107,9 +100,9 @@ const WineEvaluationDashboard: React.FC = () => {
   }
 
   const chartData = evaluationData.criteria_scores.map(item => ({
-    name: item.Criterion,
-    score: item.Score,
-    fill: getBarColor(item.Score)
+    name: item.criterion,
+    score: item.score,
+    fill: getBarColor(item.score)
   }));
 
   return (
@@ -175,7 +168,7 @@ const WineEvaluationDashboard: React.FC = () => {
           <div className="bg-white rounded-lg shadow-lg p-6">
             <h2 className="text-xl font-gilda text-darkBrown mb-4 pb-2 border-b border-background">Areas for Improvement</h2>
             <ul className="space-y-2">
-              {evaluationData.improvements.map((improvement, index) => (
+              {evaluationData.areasForImprovement.map((improvement, index) => (
                 <li key={index} className="flex items-start">
                   <span className="text-orange-500 mr-2">⚠</span>
                   <span>{improvement}</span>
@@ -189,7 +182,7 @@ const WineEvaluationDashboard: React.FC = () => {
         <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
           <h2 className="text-xl font-gilda text-darkBrown mb-4 pb-2 border-b border-background">Key Recommendations</h2>
           <ol className="space-y-4">
-            {evaluationData.recommendations.map((recommendation, index) => (
+            {evaluationData.keyRecommendations.map((recommendation, index) => (
               <li key={index} className="flex">
                 <div className="flex-shrink-0 w-8 h-8 rounded-full bg-darkBrown text-white flex items-center justify-center mr-3">
                   {index + 1}
@@ -205,14 +198,14 @@ const WineEvaluationDashboard: React.FC = () => {
           <h2 className="text-xl font-gilda text-darkBrown mb-4 pb-2 border-b border-background">Detailed Evaluation Notes</h2>
           <div className="space-y-4">
             {evaluationData.criteria_scores.map((criterion) => (
-              <div key={criterion.Criterion} className="pb-4 border-b border-gray-100 last:border-0">
+              <div key={criterion.criterion} className="pb-4 border-b border-gray-100 last:border-0">
                 <div className="flex justify-between items-center mb-2">
-                  <h3 className="font-medium text-darkBrown">{criterion.Criterion}</h3>
-                  <div className={`px-2 py-1 rounded text-white text-sm ${getBarColor(criterion.Score) === '#4ECDC4' ? 'bg-green-500' : (getBarColor(criterion.Score) === '#FFD166' ? 'bg-yellow-500' : 'bg-red-500')}`}>
-                    Score: {criterion.Score}/5
+                  <h3 className="font-medium text-darkBrown">{criterion.criterion}</h3>
+                  <div className={`px-2 py-1 rounded text-white text-sm ${getBarColor(criterion.score) === '#4ECDC4' ? 'bg-green-500' : (getBarColor(criterion.score) === '#FFD166' ? 'bg-yellow-500' : 'bg-red-500')}`}>
+                    Score: {criterion.score}/5
                   </div>
                 </div>
-                <p className="text-gray-700">{evaluationData.detailed_notes[criterion.Criterion]}</p>
+                <p className="text-gray-700">{evaluationData.detailed_notes[criterion.criterion]}</p>
               </div>
             ))}
           </div>
