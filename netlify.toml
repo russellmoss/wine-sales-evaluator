@@ -74,7 +74,7 @@
 
 # Increase timeout for functions that may take longer
 [functions.analyze-conversation]
-  timeout = 30
+  timeout = 300
 
 [functions.analyze-conversation-background]
   timeout = 60 
