@@ -103,7 +103,16 @@ export const handler: Handler = async (event: HandlerEvent, context: HandlerCont
       
       // Start the background job
       try {
-        const response = await fetch(`${process.env.NETLIFY_DEV_URL || ''}/.netlify/functions/analyze-conversation-background`, {
+        // Get the base URL from environment or construct it
+        const baseUrl = process.env.NETLIFY_DEV_URL || 
+                       (process.env.URL || 'https://your-site-name.netlify.app');
+        
+        // Construct the full URL for the background function
+        const backgroundFunctionUrl = `${baseUrl}/.netlify/functions/analyze-conversation-background`;
+        
+        console.log(`Main function: Calling background function at ${backgroundFunctionUrl}`);
+        
+        const response = await fetch(backgroundFunctionUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
