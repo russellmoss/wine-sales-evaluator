@@ -9,6 +9,7 @@
   CLAUDE_API_KEY = ""
   NEXT_PUBLIC_CLAUDE_API_KEY = ""
   DEBUG = "*"
+  NPM_FLAGS = "--legacy-peer-deps"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
@@ -21,7 +22,7 @@
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
-  external_node_modules = ["@anthropic-ai/sdk"]
+  external_node_modules = ["@anthropic-ai/sdk", "tailwindcss", "postcss", "autoprefixer"]
 
 [functions.analyze-conversation]
   included_files = ["public/data/**"]

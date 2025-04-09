@@ -19,7 +19,7 @@ import {
 import dynamic from 'next/dynamic';
 
 // Dynamically import PDFExport with no SSR
-const PDFExportComponent = dynamic(() => import('@/components/PDFExport'), {
+const PDFExportComponent = dynamic(() => import('../../components/PDFExport'), {
   ssr: false,
   loading: () => (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -269,20 +269,20 @@ export default function DetailedResultsPage() {
           <div className="flex mb-2 items-center justify-between">
             <div>
               <span className="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-blue-600 bg-blue-200">
-                {evaluationData.totalScore > 100 
-                  ? Math.round((evaluationData.totalScore / 500) * 100).toFixed(1) 
-                  : evaluationData.totalScore.toFixed(1)}%
+                {evaluationData.overallScore > 100 
+                  ? Math.round((evaluationData.overallScore / 500) * 100).toFixed(1) 
+                  : evaluationData.overallScore.toFixed(1)}%
               </span>
             </div>
           </div>
           <div className="overflow-hidden h-2 mb-4 text-xs flex rounded bg-blue-200">
             <div
-              style={{ width: `${evaluationData.totalScore > 100 
-                ? Math.round((evaluationData.totalScore / 500) * 100) 
-                : evaluationData.totalScore}%` }}
-              className={`shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center ${getScoreColor(evaluationData.totalScore > 100 
-                ? Math.round((evaluationData.totalScore / 500) * 100) / 20 
-                : evaluationData.totalScore / 20)}`}
+              style={{ width: `${evaluationData.overallScore > 100 
+                ? Math.round((evaluationData.overallScore / 500) * 100) 
+                : evaluationData.overallScore}%` }}
+              className={`shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center ${getScoreColor(evaluationData.overallScore > 100 
+                ? Math.round((evaluationData.overallScore / 500) * 100) / 20 
+                : evaluationData.overallScore / 20)}`}
             />
           </div>
         </div>
