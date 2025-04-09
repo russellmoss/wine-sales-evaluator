@@ -9,4 +9,5 @@ export interface AnalysisState {
 export interface AnalysisResult {
   success: boolean;
   data?: WineEvaluation;
- 
+  error?: string;
+} 
