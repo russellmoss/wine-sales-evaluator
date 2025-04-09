@@ -25,7 +25,7 @@
 
 [functions.analyze-conversation]
   included_files = ["public/data/wines_sales_rubric.md", "public/data/evaluation_new.json"]
-  timeout = 60
+  timeout = 300
 
 [dev]
   command = "npm run dev"
