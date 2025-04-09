@@ -13,14 +13,12 @@
 [plugins]
   package = "@netlify/plugin-nextjs"
 
-[functions]
-  node_bundler = "esbuild"
-  external_node_modules = ["@anthropic-ai/sdk", "uuid"]
-
 [[functions]]
   pattern = "analyze-conversation"
   included_files = ["public/data/*"]
   timeout = 60
+  node_bundler = "esbuild"
+  external_node_modules = ["@anthropic-ai/sdk", "uuid"]
 
 [[redirects]]
   from = "/api/*"
