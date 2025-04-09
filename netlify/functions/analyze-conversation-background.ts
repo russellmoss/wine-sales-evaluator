@@ -703,171 +703,90 @@ Return ONLY THE JSON with no additional text. The JSON must match the example fo
       // Log the structure to see what fields are present/missing
       console.log('Background function: Parsed evaluation data structure:', Object.keys(evaluationData));
      
-      // Validate the structure of the received JSON
-      const requiredFields = ['staffName', 'date', 'performanceLevel', 
-                             'criteriaScores', 'strengths', 'areasForImprovement', 'keyRecommendations'];
+      // Validate the evaluation data structure
+      if (!evaluationData || typeof evaluationData !== 'object') {
+        console.error('Background function: Invalid evaluation data structure:', evaluationData);
+        job.status = 'failed';
+        job.error = 'Invalid evaluation data structure returned from Claude';
+        job.updatedAt = Date.now();
+        await storage.saveJob(job);
+        return;
+      }
+
+      // Ensure the evaluation data has the required fields
+      const requiredFields = ['staffName', 'date', 'overallScore', 'totalScore', 'criteriaScores', 'strengths', 'areasForImprovement'];
+      const missingFields = requiredFields.filter(field => !(field in evaluationData));
       
-      const missingFields = requiredFields.filter(field => !evaluationData[field as keyof EvaluationData]);
       if (missingFields.length > 0) {
-        console.error('Background function: Missing required fields:', missingFields);
+        console.error('Background function: Missing required fields in evaluation data:', missingFields);
         
-        // Try to repair the data instead of throwing an error
-        console.log('Attempting to repair evaluation data with missing fields');
-        evaluationData = validateAndRepairEvaluationData(evaluationData, markdown);
+        // Try to repair the data structure if possible
+        const repairedData = {
+          staffName: evaluationData.staffName || 'Unknown Staff',
+          date: evaluationData.date || new Date().toISOString().split('T')[0],
+          overallScore: evaluationData.overallScore || 0,
+          totalScore: evaluationData.totalScore || 0,
+          criteriaScores: Array.isArray(evaluationData.criteriaScores) ? evaluationData.criteriaScores : [],
+          strengths: Array.isArray(evaluationData.strengths) ? evaluationData.strengths : [],
+          areasForImprovement: Array.isArray(evaluationData.areasForImprovement) ? evaluationData.areasForImprovement : [],
+          performanceLevel: evaluationData.performanceLevel || 'Needs Improvement',
+          keyRecommendations: Array.isArray(evaluationData.keyRecommendations) ? evaluationData.keyRecommendations : []
+        };
+        
+        // Check if we have at least some valid data
+        const hasValidData = repairedData.criteriaScores.length > 0 || 
+                            repairedData.strengths.length > 0 || 
+                            repairedData.areasForImprovement.length > 0;
+        
+        if (hasValidData) {
+          console.log('Background function: Using repaired evaluation data structure');
+          evaluationData = repairedData;
+        } else {
+          job.status = 'failed';
+          job.error = `Missing required fields in evaluation data: ${missingFields.join(', ')}`;
+          job.updatedAt = Date.now();
+          await storage.saveJob(job);
+          return;
+        }
       }
-      
-      // Handle both overallScore and totalScore fields
-      if (evaluationData.totalScore !== undefined) {
-        console.log('Background function: Using totalScore as overallScore');
-        evaluationData.overallScore = evaluationData.totalScore;
-      } else if (evaluationData.overallScore === undefined) {
-        // Calculate overallScore from criteriaScores if neither field is present
-        console.log('Background function: Calculating overallScore from criteriaScores');
-        const totalWeightedScore = evaluationData.criteriaScores.reduce((sum, criterion) => {
-          return sum + (criterion.weightedScore || 0);
-        }, 0);
-        evaluationData.overallScore = Math.round(totalWeightedScore / 5);
-      }
-      
-      // Ensure overallScore is a number
-      if (typeof evaluationData.overallScore === 'string') {
-        console.log('Background function: Converting overallScore from string to number');
-        evaluationData.overallScore = parseFloat(evaluationData.overallScore);
-      }
-      
-      if (typeof evaluationData.overallScore !== 'number' || isNaN(evaluationData.overallScore)) {
-        console.error('Background function: Invalid overallScore:', evaluationData.overallScore);
-        // Instead of throwing an error, set a default value
-        evaluationData.overallScore = 0;
-      }
-      
-      // Ensure the score is a percentage (0-100)
-      if (evaluationData.overallScore > 100) {
-        console.log('Background function: Adjusting overallScore to percentage range');
-        evaluationData.overallScore = Math.round((evaluationData.overallScore / 500) * 100);
-      }
-      
-      // Ensure criteriaScores is properly formatted
+
+      // Ensure criteriaScores is an array
       if (!Array.isArray(evaluationData.criteriaScores)) {
         console.error('Background function: criteriaScores is not an array:', evaluationData.criteriaScores);
-        // Instead of throwing an error, create a default array
         evaluationData.criteriaScores = [];
       }
-      
-      // More flexible validation for criteria scores length
-      if (evaluationData.criteriaScores.length !== 10) {
-        console.warn(`Background function: criteriaScores has ${evaluationData.criteriaScores.length} items, expected 10`);
-        
-        // If we have fewer than 10, add default ones
-        if (evaluationData.criteriaScores.length < 10) {
-          console.log('Adding default criteria scores to reach 10');
-          const defaultCriteria = [
-            { criterion: "Initial Greeting and Welcome", weight: 8 },
-            { criterion: "Wine Knowledge and Recommendations", weight: 10 },
-            { criterion: "Customer Engagement", weight: 10 },
-            { criterion: "Sales Techniques", weight: 10 },
-            { criterion: "Upselling and Cross-selling", weight: 8 },
-            { criterion: "Handling Customer Questions", weight: 8 },
-            { criterion: "Personalization", weight: 8 },
-            { criterion: "Closing the Sale", weight: 8 },
-            { criterion: "Follow-up and Future Business", weight: 8 },
-            { criterion: "Closing Interaction", weight: 8 }
-          ];
-          
-          for (let i = evaluationData.criteriaScores.length; i < 10; i++) {
-            const defaultCriterion = defaultCriteria[i - evaluationData.criteriaScores.length];
-            evaluationData.criteriaScores.push({
-              criterion: defaultCriterion.criterion,
-              weight: defaultCriterion.weight,
-              score: 3,
-              weightedScore: defaultCriterion.weight * 3,
-              notes: "Default criteria added due to missing data"
-            });
-          }
-        }
-        // If we have more than 10, just take the first 10
-        else if (evaluationData.criteriaScores.length > 10) {
-          console.log('Truncating criteriaScores to 10 items');
-          evaluationData.criteriaScores = evaluationData.criteriaScores.slice(0, 10);
+
+      // Ensure strengths and areasForImprovement are arrays
+      if (!Array.isArray(evaluationData.strengths)) {
+        console.error('Background function: strengths is not an array:', evaluationData.strengths);
+        evaluationData.strengths = [];
+      }
+
+      if (!Array.isArray(evaluationData.areasForImprovement)) {
+        console.error('Background function: areasForImprovement is not an array:', evaluationData.areasForImprovement);
+        evaluationData.areasForImprovement = [];
+      }
+
+      // Calculate overall score if not provided
+      if (typeof evaluationData.overallScore !== 'number' || isNaN(evaluationData.overallScore)) {
+        console.log('Background function: Calculating overall score from criteria scores');
+        if (evaluationData.criteriaScores.length > 0) {
+          const totalScore = evaluationData.criteriaScores.reduce((sum, criteria) => {
+            return sum + (typeof criteria.score === 'number' ? criteria.score : 0);
+          }, 0);
+          evaluationData.overallScore = Math.round(totalScore / evaluationData.criteriaScores.length);
+          evaluationData.totalScore = totalScore;
+        } else {
+          evaluationData.overallScore = 0;
+          evaluationData.totalScore = 0;
         }
       }
-      
-      // Validate each criteria score entry
-      evaluationData.criteriaScores.forEach((score, index) => {
-        const requiredScoreFields = ['criterion', 'weight', 'score', 'weightedScore', 'notes'];
-        const missingScoreFields = requiredScoreFields.filter(field => !score[field as keyof CriteriaScore]);
-        if (missingScoreFields.length > 0) {
-          console.warn(`Background function: Missing fields in criteria score ${index + 1}:`, missingScoreFields);
-          
-          // Fix missing fields instead of throwing an error
-          if (!score.criterion) score.criterion = `Criterion ${index + 1}`;
-          if (score.weight === undefined) score.weight = 8;
-          if (score.score === undefined) score.score = 3;
-          if (score.weightedScore === undefined) score.weightedScore = score.weight * score.score;
-          if (!score.notes) score.notes = "No notes provided";
-        }
-        
-        // Ensure numeric fields are actually numbers
-        if (typeof score.weight !== 'number') {
-          console.log(`Background function: Converting weight to number for criteria ${index + 1}`);
-          score.weight = parseFloat(score.weight as any);
-          if (isNaN(score.weight)) {
-            console.warn(`Background function: Invalid weight value for criteria ${index + 1}, using default`);
-            score.weight = 8;
-          }
-        }
-        
-        if (typeof score.score !== 'number') {
-          console.log(`Background function: Converting score to number for criteria ${index + 1}`);
-          score.score = parseFloat(score.score as any);
-          if (isNaN(score.score)) {
-            console.warn(`Background function: Invalid score value for criteria ${index + 1}, using default`);
-            score.score = 3;
-          }
-        }
-        
-        if (typeof score.weightedScore !== 'number') {
-          console.log(`Background function: Calculating weightedScore for criteria ${index + 1}`);
-          score.weightedScore = score.weight * score.score;
-        }
-      });
-      
-      // Ensure arrays have the right length
-      ['strengths', 'areasForImprovement', 'keyRecommendations'].forEach(field => {
-        const arrayField = field as keyof Pick<EvaluationData, 'strengths' | 'areasForImprovement' | 'keyRecommendations'>;
-        if (!Array.isArray(evaluationData[arrayField])) {
-          console.warn(`Background function: ${field} is not an array, creating empty array`);
-          evaluationData[arrayField] = [];
-        }
-        
-        if (evaluationData[arrayField].length !== 3) {
-          console.warn(`Background function: ${field} has ${evaluationData[arrayField].length} items, expected 3`);
-          
-          // If we have fewer than 3, add default ones
-          if (evaluationData[arrayField].length < 3) {
-            const defaultValues = {
-              strengths: ['Not specified', 'Not specified', 'Not specified'],
-              areasForImprovement: ['Not specified', 'Not specified', 'Not specified'],
-              keyRecommendations: ['Not specified', 'Not specified', 'Not specified']
-            };
-            
-            for (let i = evaluationData[arrayField].length; i < 3; i++) {
-              evaluationData[arrayField].push(defaultValues[arrayField][i - evaluationData[arrayField].length]);
-            }
-          }
-          // If we have more than 3, just take the first 3
-          else if (evaluationData[arrayField].length > 3) {
-            evaluationData[arrayField] = evaluationData[arrayField].slice(0, 3);
-          }
-        }
-      });
-      
-      // Update job with the result
+
+      // Save the job with the evaluation data
       job.status = 'completed';
       job.result = evaluationData;
       job.updatedAt = Date.now();
       await storage.saveJob(job);
-      
       console.log(`Background function: Job ${jobId} completed successfully`);
     } catch (error) {
       console.error(`Background function: Error processing job ${jobId}:`, error);
