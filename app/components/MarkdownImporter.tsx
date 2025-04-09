@@ -65,6 +65,20 @@ const MarkdownImporter: React.FC<MarkdownImporterProps> = ({
         throw new Error('The evaluation data returned does not have the expected format');
       }
       
+      // Handle both overallScore and totalScore fields
+      if (!evaluationData.overallScore && evaluationData.totalScore !== undefined) {
+        evaluationData.overallScore = evaluationData.totalScore;
+      }
+      
+      // Ensure overallScore is a number
+      if (typeof evaluationData.overallScore === 'string') {
+        evaluationData.overallScore = parseFloat(evaluationData.overallScore);
+      }
+      
+      if (typeof evaluationData.overallScore !== 'number' || isNaN(evaluationData.overallScore)) {
+        throw new Error('The evaluation data returned does not have a valid overallScore');
+      }
+      
       onAnalysisComplete(evaluationData);
       toast.success('Conversation analyzed successfully!');
       

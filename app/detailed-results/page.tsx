@@ -58,9 +58,26 @@ export default function DetailedResultsPage() {
       const parsedData = JSON.parse(storedData);
       
       // Validate the data structure
-      if (!parsedData.staffName || !parsedData.date || !parsedData.overallScore || !parsedData.criteriaScores) {
+      if (!parsedData.staffName || !parsedData.date || !parsedData.criteriaScores) {
         console.error('Invalid evaluation data structure:', parsedData);
         setError('Invalid evaluation data structure. Please upload a conversation again.');
+        setLoading(false);
+        return;
+      }
+      
+      // Handle both overallScore and totalScore fields
+      if (!parsedData.overallScore && parsedData.totalScore !== undefined) {
+        parsedData.overallScore = parsedData.totalScore;
+      }
+      
+      // Ensure overallScore is a number
+      if (typeof parsedData.overallScore === 'string') {
+        parsedData.overallScore = parseFloat(parsedData.overallScore);
+      }
+      
+      if (typeof parsedData.overallScore !== 'number' || isNaN(parsedData.overallScore)) {
+        console.error('Invalid overallScore in evaluation data:', parsedData.overallScore);
+        setError('Invalid overallScore in evaluation data. Please upload a conversation again.');
         setLoading(false);
         return;
       }
