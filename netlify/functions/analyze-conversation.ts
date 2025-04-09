@@ -1,4 +1,4 @@
-import { Handler } from '@netlify/functions';
+import { Handler } from '@netlify/functions/dist/function/handler';
 import { Anthropic } from '@anthropic-ai/sdk';
 import fs from 'fs';
 import path from 'path';
@@ -53,7 +53,7 @@ try {
   }
 }
 
-export const handler: Handler = async (event) => {
+export const handler: Handler = async (event: any) => {
   console.log('Netlify function: Handler started');
   console.log(`Netlify function: HTTP method: ${event.httpMethod}`);
   
