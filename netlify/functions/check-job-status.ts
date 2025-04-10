@@ -76,7 +76,7 @@ export const handler: Handler = async (event: HandlerEvent, context: HandlerCont
           try {
             const jobData = JSON.parse(fs.readFileSync(jobFile, 'utf8'));
             job = jobData;
-            console.log(`Found job in local file with status: ${job.status}`);
+            console.log(`Found job in local file with status: ${job?.status || 'unknown'}`);
           } catch (error) {
             console.error(`Error reading local job file: ${error}`);
           }
