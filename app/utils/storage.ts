@@ -417,32 +417,33 @@ export function getStorageProvider(): StorageProvider {
   const storageType = process.env.JOB_STORAGE_TYPE || 'file';
   const maxAge = parseInt(process.env.JOB_MAX_AGE || '86400000', 10);
   const isDev = process.env.NODE_ENV === 'development';
-  const isNetlify = process.env.NETLIFY === 'true';
   const isRender = process.env.RENDER === 'true';
 
-  console.log(`Storage Provider: Initializing with type=${storageType}, isDev=${isDev}, isNetlify=${isNetlify}, isRender=${isRender}`);
+  console.log(`Storage Provider: Initializing with type=${storageType}, isDev=${isDev}, isRender=${isRender}`);
   console.log(`Storage Provider: Environment variables:`, {
     NODE_ENV: process.env.NODE_ENV,
-    NETLIFY: process.env.NETLIFY,
     RENDER: process.env.RENDER,
     JOB_STORAGE_TYPE: process.env.JOB_STORAGE_TYPE,
     JOB_MAX_AGE: process.env.JOB_MAX_AGE,
-    NETLIFY_SITE_ID: process.env.NETLIFY_SITE_ID ? 'Set (not shown for security)' : 'Not set',
-    NETLIFY_ACCESS_TOKEN: process.env.NETLIFY_ACCESS_TOKEN ? 'Set (not shown for security)' : 'Not set'
+    RENDER_STORAGE_DIR: process.env.RENDER_STORAGE_DIR || 'Not set'
   });
 
-  // Determine appropriate storage directory for Render
+  // Determine appropriate storage directory
   let storageDir;
-  if (process.env.NODE_ENV === 'production') {
-    // For Render, use a writable directory
-    storageDir = process.env.RENDER_STORAGE_DIR || '/tmp/jobs';
+  if (process.env.NODE_ENV === 'production' && process.env.RENDER === 'true') {
+    // For Render production, use the persistent disk mount path
+    storageDir = process.env.RENDER_STORAGE_DIR || '/var/data/jobs';
+    console.log(`Storage Provider: Using Render persistent storage at ${storageDir}`);
+  } else if (process.env.NODE_ENV === 'production') {
+    // For other production environments (not Render)
+    storageDir = '/tmp/jobs';
+    console.log(`Storage Provider: Using production temporary storage at ${storageDir}`);
   } else {
     // For local development
     storageDir = path.join(process.cwd(), '.render', 'jobs');
+    console.log(`Storage Provider: Using local development storage at ${storageDir}`);
   }
 
-  console.log(`Storage Provider: Using file storage provider with directory: ${storageDir}`);
-  
   // Create the directory if it doesn't exist
   if (!fs.existsSync(storageDir)) {
     console.log(`Storage Provider: Creating storage directory: ${storageDir}`);
