@@ -3,8 +3,29 @@ import { Anthropic } from '@anthropic-ai/sdk';
 import fs from 'fs';
 import { getStorageProvider, createJob, JobStatus } from '../../app/utils/storage';
 
+// Add rate limiting constants
+const RATE_LIMIT = {
+  MAX_REQUESTS_PER_MINUTE: 10,
+  REQUEST_WINDOW_MS: 60000, // 1 minute
+  lastRequestTime: 0
+};
+
+// Function to enforce rate limiting
+async function enforceRateLimit() {
+  const now = Date.now();
+  const timeSinceLastRequest = now - RATE_LIMIT.lastRequestTime;
+  
+  if (timeSinceLastRequest < RATE_LIMIT.REQUEST_WINDOW_MS / RATE_LIMIT.MAX_REQUESTS_PER_MINUTE) {
+    const delayMs = (RATE_LIMIT.REQUEST_WINDOW_MS / RATE_LIMIT.MAX_REQUESTS_PER_MINUTE) - timeSinceLastRequest;
+    console.log(`Rate limiting: Waiting ${delayMs}ms before next request`);
+    await new Promise(resolve => setTimeout(resolve, delayMs));
+  }
+  
+  RATE_LIMIT.lastRequestTime = Date.now();
+}
+
 // Add this function for direct evaluation 
-async function evaluateDirectly(markdown: string): Promise<any> {
+async function evaluateDirectly(markdown: string, fileName: string): Promise<any> {
   console.log('Performing direct evaluation with Claude API');
   
   const anthropic = new Anthropic({
@@ -12,7 +33,7 @@ async function evaluateDirectly(markdown: string): Promise<any> {
   });
   
   // Create a more detailed system prompt
-  const systemPrompt = `You are a wine sales performance evaluator analyzing a conversation between a winery staff member and guests. 
+  const systemPrompt = `You are a winery general manager with tasting room and sales expertise analyzing a conversation between a winery staff member and guests. 
   
 Your task is to provide a detailed, objective evaluation based on the conversation. For each criterion, you MUST:
 
@@ -27,7 +48,9 @@ For each criterion, your notes should:
 - Then "Areas for Improvement:" with concrete suggestions
 - End with "Score Rationale:" explaining why you gave that score
 
-Be thorough but concise in your analysis. Focus on actionable feedback that will help the staff member improve.`;
+Be thorough but concise in your analysis. Focus on actionable feedback that will help the staff member improve.
+
+As a winery general manager, provide positive but constructive feedback that helps the associate improve their sales skills.`;
 
   // Create a more detailed user prompt
   const userPrompt = `Evaluate this wine tasting conversation and return a JSON with these fields:
@@ -59,7 +82,7 @@ For each criterion, provide detailed notes that include:
 4. A fair score based on the evidence
 
 The weighted score for each criterion should be calculated as: score × weight.
-The overall score should be calculated as the sum of all weighted scores divided by 5, to get a percentage.
+The overall score should be calculated as the sum of all weighted scores divided by the sum of all weights, to get a percentage.
 
 Here's the conversation to evaluate:
 ${markdown.substring(0, 15000)}${markdown.length > 15000 ? '...(truncated)' : ''}
@@ -67,6 +90,9 @@ ${markdown.substring(0, 15000)}${markdown.length > 15000 ? '...(truncated)' : ''
 Return ONLY the valid JSON with no additional explanation or text.`;
 
   try {
+    // Enforce rate limiting before making the API call
+    await enforceRateLimit();
+    
     // Call Claude API with Claude 3 Sonnet
     const response = await anthropic.messages.create({
       model: "claude-3-7-sonnet-20250219",
@@ -300,8 +326,15 @@ function validateAndRepairEvaluationData(data: any, markdown: string): any {
     const totalWeightedScore = fallbackData.criteriaScores.reduce((sum, criterion) => {
       return sum + criterion.weightedScore;
     }, 0);
-    fallbackData.overallScore = Math.round((totalWeightedScore / 5));
-    console.log(`Calculated overall score: ${fallbackData.overallScore}`);
+    
+    // Calculate the total possible score (sum of all weights)
+    const totalPossibleScore = fallbackData.criteriaScores.reduce((sum, criterion) => {
+      return sum + criterion.weight;
+    }, 0);
+    
+    // Calculate the overall score as a percentage
+    fallbackData.overallScore = Math.round((totalWeightedScore / totalPossibleScore) * 100);
+    console.log(`Calculated overall score: ${fallbackData.overallScore}% (${totalWeightedScore}/${totalPossibleScore})`);
   }
   
   // Set performance level based on overall score
@@ -416,7 +449,13 @@ async function performBasicEvaluation(markdown: string): Promise<any> {
   
   // Calculate overall score
   const totalWeightedScore = criteriaScores.reduce((sum, c) => sum + c.weightedScore, 0);
-  const overallScore = Math.round((totalWeightedScore / 5));
+  
+  // Calculate the total possible score (sum of all weights)
+  const totalPossibleScore = criteriaScores.reduce((sum, c) => sum + c.weight, 0);
+  
+  // Calculate the overall score as a percentage
+  const overallScore = Math.round((totalWeightedScore / totalPossibleScore) * 100);
+  console.log(`Calculated basic evaluation overall score: ${overallScore}% (${totalWeightedScore}/${totalPossibleScore})`);
   
   // Determine performance level
   let performanceLevel = "Needs Improvement";
@@ -467,93 +506,108 @@ const truncateConversation = (markdown: string, maxLength: number = 8000): strin
 
 // Update the handler function to use direct evaluation
 export const handler: Handler = async (event: HandlerEvent, context: HandlerContext) => {
-  console.log('Main function: Handler started', {
-    httpMethod: event.httpMethod,
-    pathPattern: event.path,
-    hasBody: !!event.body,
-    contentLength: event.body?.length
-  });
-
+  console.log('Handler started');
+  
+  // Only allow POST requests
   if (event.httpMethod !== 'POST') {
     return {
       statusCode: 405,
-      body: JSON.stringify({ error: 'Method not allowed' })
+      body: JSON.stringify({ message: 'Method not allowed' }),
     };
   }
 
   try {
-    if (!event.body) {
-      return {
-        statusCode: 400,
-        body: JSON.stringify({ error: 'No request body provided' })
-      };
-    }
-
-    const { markdown, fileName } = JSON.parse(event.body);
-
+    // Parse the request body
+    const { markdown, fileName, directEvaluation } = JSON.parse(event.body || '{}');
+    
     if (!markdown) {
       return {
         statusCode: 400,
-        body: JSON.stringify({ error: 'No markdown content provided' })
+        body: JSON.stringify({ message: 'Markdown content is required' }),
       };
     }
 
-    // Get the KV storage provider
-    const storage = getStorageProvider();
+    // If direct evaluation is requested, evaluate directly and return the result
+    if (directEvaluation) {
+      console.log('Performing direct evaluation as requested');
+      const result = await evaluateDirectly(markdown, fileName);
+      
+      return {
+        statusCode: 200,
+        body: JSON.stringify({ result }),
+      };
+    }
 
+    // Initialize storage provider
+    const storageProvider = getStorageProvider();
+    
     // Create a new job
-    const job = createJob();
-    job.status = 'pending';
-    job.markdown = markdown;
-    job.fileName = fileName;
-    job.createdAt = Date.now();
-    job.updatedAt = Date.now();
+    const job = createJob(markdown, fileName);
     
-    // Save the job to KV store
-    await storage.saveJob(job);
-    
-    // Verify the job was saved by trying to retrieve it
-    const savedJob = await storage.getJob(job.id);
-    if (!savedJob) {
-      throw new Error('Failed to save job - job not found after saving');
-    }
-    
-    console.log(`Main function: Created and saved job ${job.id} with status ${job.status}`);
-
-    // Call the background function
-    const response = await fetch(`${process.env.URL}/.netlify/functions/analyze-conversation-background`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        jobId: job.id,
-        markdown,
-        fileName
-      })
-    });
-
-    if (!response.ok) {
-      console.error(`Background function returned ${response.status}`);
-      throw new Error(`Background function returned ${response.status}`);
+    // Save the job to the KV store
+    try {
+      await storageProvider.saveJob(job);
+      console.log(`Job created with ID: ${job.id}`);
+    } catch (error) {
+      console.error('Error saving job to storage:', error);
+      // Fall back to direct evaluation if storage operations fail
+      console.log('Falling back to direct evaluation due to storage error');
+      const result = await evaluateDirectly(markdown, fileName);
+      
+      return {
+        statusCode: 200,
+        body: JSON.stringify({ result }),
+      };
     }
 
-    // Return the job ID immediately
-    return {
-      statusCode: 202,
-      body: JSON.stringify({
-        message: 'Analysis started',
-        jobId: job.id
-      })
-    };
+    // Call the background function to process the job
+    try {
+      const response = await fetch(`${process.env.URL}/.netlify/functions/analyze-conversation-background`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          jobId: job.id,
+          conversation: markdown,
+          staffName: fileName,
+          date: new Date().toISOString().split('T')[0]
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Background function returned ${response.status}`);
+      }
+
+      console.log('Background function called successfully');
+      
+      return {
+        statusCode: 202,
+        body: JSON.stringify({
+          jobId: job.id,
+          message: 'Analysis job created successfully',
+        }),
+      };
+    } catch (error) {
+      console.error('Error calling background function:', error);
+      // Fall back to direct evaluation if background function call fails
+      console.log('Falling back to direct evaluation due to background function error');
+      const result = await evaluateDirectly(markdown, fileName);
+      
+      return {
+        statusCode: 200,
+        body: JSON.stringify({ result }),
+      };
+    }
   } catch (error) {
-    console.error('Main function: Error processing request:', error);
+    console.error('Error in handler:', error);
     return {
       statusCode: 500,
-      body: JSON.stringify({ 
-        error: 'Internal server error',
-        message: error instanceof Error ? error.message : 'Unknown error'
-      })
+      body: JSON.stringify({
+        message: 'Internal server error',
+        error: error instanceof Error ? error.message : 'Unknown error',
+        suggestion: 'Please try again or contact support if the issue persists.',
+      }),
     };
   }
 }; 

@@ -1,93 +1,93 @@
 {
   "staffName": "Russell",
   "date": "2025-04-07",
-  "totalScore": 85,
-  "performanceLevel": "Strong",
+  "overallScore": 66,
+  "performanceLevel": "Developing",
   "criteriaScores": [
     {
-      "criterion": "Greeting and Introduction",
-      "weight": 10,
-      "score": 4,
-      "weightedScore": 4,
-      "notes": "Staff demonstrated excellent greeting skills when they said: 'hi my name is Russell and I'm going to be taking care of you today is this your first time at Milea estate'. They introduced themselves by name and asked if this was the guests' first visit, showing attentiveness to new customers."
+      "criterion": "Initial Greeting and Welcome",
+      "weight": 8,
+      "score": 2,
+      "weightedScore": 16,
+      "notes": "Russell provided only a basic greeting ('hi my name is Russell and I'm going to be taking care of you today is this your first time at Malaya') without warmth or enthusiasm. The greeting lacked personalization and did not create an exciting first impression."
     },
     {
-      "criterion": "Wine Knowledge",
-      "weight": 15,
-      "score": 4,
-      "weightedScore": 6,
-      "notes": "Staff demonstrated strong wine knowledge when they said: 'If you like reds, you'll really enjoy our Vincenza, which is our estate cabernet franc. It won a silver medal last year. It's named after Barry Milea's mother, so it has a special place in our hearts. It has nice notes of cherries, graphite.' They provided specific details about the wine's origin, awards, and tasting notes."
-    },
-    {
-      "criterion": "Tasting Experience Management",
-      "weight": 15,
-      "score": 5,
-      "weightedScore": 7.5,
-      "notes": "Staff demonstrated exceptional tasting experience management when they said: 'Since it's your first time here, I recommend trying our signature flight which includes 5 of our most popular wines. It's a great introduction to what we do here.' They tailored the experience to first-time visitors and explained the rationale behind their recommendation."
-    },
-    {
-      "criterion": "Storytelling",
+      "criterion": "Building Rapport",
       "weight": 10,
       "score": 3,
-      "weightedScore": 3,
-      "notes": "Staff demonstrated limited storytelling when they said: 'You can read a bit about our history on the back of the menu, but basically the property has been in the family for a while and they decided to plant vineyards about 10 years ago.' They directed guests to read the menu rather than engaging them with the winery's story. Suggestions: Develop a brief, engaging story about the winery's history that can be shared with guests. Include personal anecdotes about the family's connection to the land."
+      "weightedScore": 30,
+      "notes": "Russell did ask where guests were from early in the conversation (message 3), which was positive, and made a comment about Pleasant Valley being historic. However, he didn't follow up on their comments about being excited to visit or ask deeper personal questions to establish meaningful connection."
     },
     {
-      "criterion": "Food Pairing",
+      "criterion": "Winery History and Ethos",
       "weight": 10,
-      "score": 4,
-      "weightedScore": 4,
-      "notes": "Staff demonstrated good food pairing knowledge when they said: 'Yeah, it would go great with seafood pasta.' They recognized the guest's mention of seafood pasta and confirmed the pairing appropriateness."
+      "score": 2,
+      "weightedScore": 20,
+      "notes": "Russell mostly referred guests to the menu for winery history rather than sharing compelling stories. He briefly mentioned the Vincenza wine being named after Barry Milea's mother but provided minimal information about the winery's founding, values, or philosophy."
     },
     {
-      "criterion": "Wine Club Promotion",
+      "criterion": "Storytelling and Analogies",
+      "weight": 10,
+      "score": 2,
+      "weightedScore": 20,
+      "notes": "Russell's descriptions were primarily factual with minimal storytelling or analogies. When describing wines, he offered basic flavor notes ('cherries, graphite') but didn't use rich comparisons or memorable narratives to bring the wines to life beyond mentioning Vincenza was named after the owner's mother."
+    },
+    {
+      "criterion": "Recognition of Buying Signals",
+      "weight": 12,
+      "score": 2,
+      "weightedScore": 24,
+      "notes": "Russell missed several clear buying signals. The guests repeatedly expressed enthusiasm about wines, mentioned taking bottles home, and even explicitly stated 'Maybe we should join the wine club' (message 20), but Russell never followed up on these opportunities, instead just bringing the check (message 19)."
+    },
+    {
+      "criterion": "Customer Data Capture",
+      "weight": 8,
+      "score": 2,
+      "weightedScore": 16,
+      "notes": "Russell mentioned the QR code for the giveaway early but did not attempt to collect customer information throughout the interaction. Despite the guests' expressed interest in wines and even mentioning the wine club, he made no efforts to capture their contact information."
+    },
+    {
+      "criterion": "Asking for the Sale",
+      "weight": 12,
+      "score": 1,
+      "weightedScore": 12,
+      "notes": "Russell never directly asked for a sale throughout the entire interaction. Despite guests expressing interest in purchasing wine and joining the wine club, he did not capitalize on these opportunities, merely stating he would 'have your check be ready to check out' at the end."
+    },
+    {
+      "criterion": "Personalized Wine Recommendations",
       "weight": 10,
       "score": 3,
-      "weightedScore": 3,
-      "notes": "Staff demonstrated limited wine club promotion when they didn't proactively discuss the wine club benefits after the guest mentioned: 'maybe we should consider joining your wine club?' Suggestions: When guests express interest in the wine club, proactively explain the benefits, such as allocations of popular wines, discounts, and exclusive events."
+      "weightedScore": 30,
+      "notes": "Russell recommended the tasting flight as appropriate for first-time visitors, which showed some personalization. He also shared his personal favorite (Vincenza) but didn't tailor specific bottle recommendations based on guests' reactions and preferences to the wines they tasted."
     },
     {
-      "criterion": "Sales Techniques",
-      "weight": 10,
-      "score": 4,
-      "weightedScore": 4,
-      "notes": "Staff demonstrated good sales techniques when they highlighted the award-winning status of the Vincenza wine: 'It won a silver medal last year.' They also mentioned its popularity: 'This is definitely one of our most popular wines.'"
+      "criterion": "Wine Club Presentation",
+      "weight": 12,
+      "score": 1,
+      "weightedScore": 12,
+      "notes": "Russell made no mention of the wine club despite the guests twice mentioning interest in joining (messages 12 and 20). This was a significant missed opportunity as the guests directly stated 'Maybe we should join the wine club so we can secure an allocation!'"
     },
     {
-      "criterion": "Closing and Follow-up",
-      "weight": 5,
+      "criterion": "Closing Interaction",
+      "weight": 8,
       "score": 3,
-      "weightedScore": 1.5,
-      "notes": "Staff demonstrated limited closing skills when they said: 'Great, when I come back I will have your check be ready to check out.' They didn't ask if the guests would like to join the wine club or if they had any questions. Suggestions: Before closing, ask if guests would like to join the wine club and explain the benefits. Thank them for visiting and invite them to return."
-    },
-    {
-      "criterion": "Customer Engagement",
-      "weight": 10,
-      "score": 4,
-      "weightedScore": 4,
-      "notes": "Staff demonstrated good customer engagement when they asked: 'is this your first time at Milea estate' and responded to the guests' questions about the wines and property. They maintained conversation throughout the tasting."
-    },
-    {
-      "criterion": "Professionalism",
-      "weight": 5,
-      "score": 5,
-      "weightedScore": 2.5,
-      "notes": "Staff demonstrated exceptional professionalism throughout the conversation. They were attentive, knowledgeable, and courteous. They maintained a friendly yet professional demeanor."
+      "weightedScore": 24,
+      "notes": "Russell's closing was basic and transactional, simply stating 'when I come back I will have your check be ready to check out.' He didn't thank the guests for their visit, acknowledge their enthusiasm, or specifically encourage them to return in the future."
     }
   ],
   "strengths": [
-    "Excellent greeting and introduction, making guests feel welcome from the start",
-    "Strong wine knowledge, able to provide specific details about wines including awards and tasting notes",
-    "Good tasting experience management, tailoring recommendations to first-time visitors"
+    "Asked where guests were from early in the conversation, showing some attempt at building rapport",
+    "Provided some product knowledge about wines, including award information and basic tasting notes",
+    "Made food recommendations when asked (brussels sprouts and arancini) showing some personalization"
   ],
   "areasForImprovement": [
-    "Limited storytelling about the winery's history and family connection",
-    "Missed opportunity to promote wine club benefits when guests expressed interest",
-    "Basic closing skills without asking about wine club membership or future visits"
+    "Completely failed to recognize and act on explicit buying signals and interest in the wine club",
+    "Lacked storytelling elements and compelling narratives around wines and winery history",
+    "Did not ask for the sale or attempt to convert enthusiasm into purchases at any point"
   ],
   "keyRecommendations": [
-    "Develop a brief, engaging story about the winery's history to share with guests instead of directing them to read the menu",
-    "Proactively explain wine club benefits when guests express interest, highlighting allocations of popular wines like the Vincenza",
-    "Improve closing by asking if guests would like to join the wine club and inviting them to return for future visits"
+    "Develop clear responses to buying signals, particularly practicing how to transition from guest enthusiasm to direct sales questions",
+    "Create 3-5 compelling stories about the winery history, vineyard practices, and flagship wines to share during tastings",
+    "Implement a consistent process for introducing the wine club to all guests, especially those who express interest in purchasing multiple bottles"
   ]
 } 

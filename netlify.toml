@@ -8,11 +8,18 @@
   NODE_VERSION = "18"
   NODE_ENV = "production"
   NETLIFY = "true"
-  # Set storage type to KV
+  
+  # Configure Netlify Blobs properly
+  # These will be set by netlify env:set
+  # NETLIFY_SITE_ID = "your-site-id"
+  # NETLIFY_ACCESS_TOKEN = "your-access-token"
+  
+  # Ensure we're using KV storage
   JOB_STORAGE_TYPE = "kv"
   JOB_MAX_AGE = "86400000"
-  # Netlify Blobs configuration - these will be overridden by actual values from Netlify
-  # NETLIFY_SITE_ID and NETLIFY_ACCESS_TOKEN are automatically set by Netlify
+  
+  # Enable Blobs
+  NETLIFY_BLOBS_ENABLED = "true"
   DEBUG = "*"
   NPM_FLAGS = "--legacy-peer-deps"
 
@@ -22,6 +29,7 @@
 [functions]
   node_bundler = "esbuild"
   external_node_modules = ["@anthropic-ai/sdk", "uuid", "@netlify/blobs"]
+  included_files = ["netlify/functions/**/*"]
 
 # Enable Netlify Blobs (KV Store)
 [[edge_functions]]
@@ -35,6 +43,10 @@
 [[edge_functions]]
   function = "analyze-conversation-background"
   path = "/api/analyze-conversation-background"
+
+[[edge_functions]]
+  function = "force-complete-job"
+  path = "/api/force-complete-job"
 
 [[redirects]]
   from = "/api/*"
@@ -50,6 +62,12 @@
 [[redirects]]
   from = "/api/check-job-status"
   to = "/.netlify/functions/check-job-status"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/force-complete-job"
+  to = "/.netlify/functions/force-complete-job"
   status = 200
   force = true
 
@@ -73,6 +91,11 @@
   # For local development, use memory storage instead of KV store
   JOB_STORAGE_TYPE = "memory"
   JOB_MAX_AGE = "86400000"
+  # Local development Blobs configuration
+  NETLIFY_BLOBS_ENABLED = "true"
+  # These will be set by netlify dev
+  # NETLIFY_SITE_ID = "dev-site-id"
+  # NETLIFY_ACCESS_TOKEN = "dev-access-token"
 
 [build.processing]
   skip_processing = false
@@ -96,4 +119,7 @@
   timeout = 300
 
 [functions.analyze-conversation-background]
-  timeout = 900 
+  timeout = 900
+
+[functions.force-complete-job]
+  timeout = 30 

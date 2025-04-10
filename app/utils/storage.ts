@@ -6,11 +6,17 @@ import { getStore } from '@netlify/blobs';
 // Define the job status interface
 export interface JobStatus {
   id: string;
-  status: 'pending' | 'processing' | 'completed' | 'failed';
+  status: 'pending' | 'processing' | 'completed' | 'failed' | 'unknown' | 'api_error';
   result?: any;
   error?: string;
-  createdAt: number;
-  updatedAt: number;
+  errorDetails?: {
+    type: string;
+    message: string;
+    timestamp: string;
+    isTimeout?: boolean;
+  };
+  createdAt: string;
+  updatedAt: string;
   expiresAt?: number; // Optional expiration timestamp
   markdown?: string; // The markdown content to analyze
   fileName?: string; // The name of the file being analyzed
@@ -23,6 +29,67 @@ export interface StorageProvider {
   listJobs(): Promise<JobStatus[]>;
   deleteJob(jobId: string): Promise<boolean>;
   cleanupExpiredJobs(): Promise<number>;
+}
+
+// Memory storage provider for local development
+export class MemoryStorageProvider implements StorageProvider {
+  private static instance: MemoryStorageProvider;
+  private jobs: Map<string, JobStatus>;
+
+  constructor() {
+    this.jobs = new Map();
+  }
+
+  public static getInstance(): MemoryStorageProvider {
+    if (!MemoryStorageProvider.instance) {
+      MemoryStorageProvider.instance = new MemoryStorageProvider();
+    }
+    return MemoryStorageProvider.instance;
+  }
+
+  async saveJob(job: JobStatus): Promise<void> {
+    console.log(`Memory Storage: Saving job ${job.id} with status ${job.status}`);
+    this.jobs.set(job.id, job);
+    console.log(`Memory Storage: Job ${job.id} saved successfully`);
+  }
+
+  async getJob(jobId: string): Promise<JobStatus | null> {
+    console.log(`Memory Storage: Retrieving job ${jobId}`);
+    const job = this.jobs.get(jobId);
+    if (job) {
+      console.log(`Memory Storage: Found job ${jobId} with status ${job.status}`);
+    } else {
+      console.log(`Memory Storage: Job ${jobId} not found`);
+    }
+    return job || null;
+  }
+
+  async listJobs(): Promise<JobStatus[]> {
+    console.log('Memory Storage: Listing all jobs');
+    return Array.from(this.jobs.values());
+  }
+
+  async deleteJob(jobId: string): Promise<boolean> {
+    console.log(`Memory Storage: Deleting job ${jobId}`);
+    const deleted = this.jobs.delete(jobId);
+    console.log(`Memory Storage: Job ${jobId} ${deleted ? 'deleted successfully' : 'not found'}`);
+    return deleted;
+  }
+
+  async cleanupExpiredJobs(): Promise<number> {
+    console.log('Memory Storage: Cleaning up expired jobs');
+    const now = Date.now();
+    let count = 0;
+    const entries = Array.from(this.jobs.entries());
+    for (const [id, job] of entries) {
+      if (job.expiresAt && job.expiresAt < now) {
+        this.jobs.delete(id);
+        count++;
+      }
+    }
+    console.log(`Memory Storage: Cleaned up ${count} expired jobs`);
+    return count;
+  }
 }
 
 // Netlify KV Store provider
@@ -38,35 +105,24 @@ export class KVStorageProvider implements StorageProvider {
 
   private initializeStore(): void {
     try {
-      // Check if we're in a Netlify environment
-      if (process.env.NETLIFY === 'true') {
-        console.log('Initializing Netlify Blobs store in Netlify environment');
-        
-        // Get site ID and token from environment variables
-        const siteID = process.env.NETLIFY_SITE_ID;
-        const token = process.env.NETLIFY_ACCESS_TOKEN;
-        
-        if (!siteID || !token) {
-          console.error('Netlify Blobs configuration missing. Please set NETLIFY_SITE_ID and NETLIFY_ACCESS_TOKEN environment variables.');
-          throw new Error('Netlify Blobs configuration missing. Please set NETLIFY_SITE_ID and NETLIFY_ACCESS_TOKEN environment variables.');
-        }
-        
-        // Set environment variables for Netlify Blobs
-        process.env.NETLIFY_SITE_ID = siteID;
-        process.env.NETLIFY_ACCESS_TOKEN = token;
-        
-        // Initialize the store
-        this.store = getStore('wine-analysis-jobs');
-        this.isInitialized = true;
-        console.log('Netlify Blobs store initialized successfully');
-      } else {
-        // For local development, use a fallback or mock implementation
-        console.warn('Not in Netlify environment. Using fallback storage for local development.');
-        this.store = getStore('wine-analysis-jobs');
-        this.isInitialized = true;
+      const siteID = process.env.NETLIFY_SITE_ID;
+      const token = process.env.NETLIFY_ACCESS_TOKEN;
+      
+      if (!siteID || !token) {
+        console.warn('Missing Netlify Blobs configuration, falling back to memory storage');
+        throw new Error('Missing Netlify Blobs configuration');
       }
+      
+      this.store = getStore({
+        name: 'wine-analysis-jobs',
+        siteID,
+        token
+      });
+      
+      this.isInitialized = true;
+      console.log('Successfully initialized Netlify Blobs store');
     } catch (error) {
-      console.error('Failed to initialize Netlify Blobs store:', error);
+      console.error('Failed to initialize Netlify Blobs:', error);
       this.isInitialized = false;
       throw error;
     }
@@ -166,40 +222,107 @@ export class KVStorageProvider implements StorageProvider {
   }
 }
 
-// File-based storage provider
+// File-based storage provider for local development
 export class FileStorageProvider implements StorageProvider {
   private jobsDir: string;
-  private maxAge: number; // Maximum age of jobs in milliseconds
+  private maxAge: number;
+  private retryAttempts: number;
+  private retryDelay: number;
 
   constructor(jobsDir: string, maxAge: number) {
     this.jobsDir = jobsDir;
     this.maxAge = maxAge;
+    this.retryAttempts = 3;
+    this.retryDelay = 1000; // 1 second
+    console.log(`FileStorageProvider: Initializing with jobsDir=${jobsDir}, maxAge=${maxAge}`);
     this.ensureJobsDir();
   }
 
   private ensureJobsDir(): void {
-    // Always use /tmp in Netlify environment
-    if (process.env.NETLIFY === 'true') {
-      this.jobsDir = '/tmp/jobs';
-    }
-    
     try {
+      console.log(`FileStorageProvider: Checking if jobs directory exists: ${this.jobsDir}`);
       if (!fs.existsSync(this.jobsDir)) {
-        console.log(`Creating jobs directory: ${this.jobsDir}`);
+        console.log(`FileStorageProvider: Creating jobs directory: ${this.jobsDir}`);
         fs.mkdirSync(this.jobsDir, { recursive: true });
+        console.log(`FileStorageProvider: Jobs directory created successfully`);
+      } else {
+        console.log(`FileStorageProvider: Jobs directory already exists`);
+        // Log directory contents for debugging
+        const files = fs.readdirSync(this.jobsDir);
+        console.log(`FileStorageProvider: Directory contains ${files.length} files:`, files);
       }
     } catch (error) {
-      console.error(`Error creating jobs directory: ${this.jobsDir}`, error);
+      console.error(`FileStorageProvider: Error creating jobs directory: ${this.jobsDir}`, error);
+      throw new Error(`Failed to create jobs directory: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Debug method to manually inspect job file content
+   * @param jobId The ID of the job to inspect
+   * @returns The raw file content and parsed job data, or null if not found
+   */
+  async debugJobFile(jobId: string): Promise<{ rawContent: string; parsedJob: JobStatus | null; filePath: string; fileStats: fs.Stats | null } | null> {
+    this.ensureJobsDir();
+    const jobPath = path.join(this.jobsDir, `${jobId}.json`);
+    
+    try {
+      if (!fs.existsSync(jobPath)) {
+        console.log(`FileStorageProvider: Debug - Job file not found: ${jobPath}`);
+        return null;
+      }
       
-      // If original directory creation failed, always try /tmp/jobs as fallback
-      if (this.jobsDir !== '/tmp/jobs') {
-        console.log('Falling back to /tmp/jobs directory');
-        this.jobsDir = '/tmp/jobs';
-        this.ensureJobsDir(); // Call recursively with new path
-      } else {
-        throw new Error(`Failed to create jobs directory: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.log(`FileStorageProvider: Debug - Reading job file: ${jobPath}`);
+      const fileStats = fs.statSync(jobPath);
+      const rawContent = await fs.promises.readFile(jobPath, 'utf8');
+      
+      let parsedJob: JobStatus | null = null;
+      try {
+        parsedJob = JSON.parse(rawContent) as JobStatus;
+      } catch (parseError) {
+        console.error(`FileStorageProvider: Debug - Error parsing job JSON:`, parseError);
+      }
+      
+      return {
+        rawContent,
+        parsedJob,
+        filePath: jobPath,
+        fileStats
+      };
+    } catch (error) {
+      console.error(`FileStorageProvider: Debug - Error reading job file:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Helper method to retry an operation with exponential backoff
+   * @param operation The async operation to retry
+   * @param operationName Name of the operation for logging
+   * @returns The result of the operation
+   */
+  private async retryOperation<T>(
+    operation: () => Promise<T>,
+    operationName: string
+  ): Promise<T> {
+    let lastError: Error | null = null;
+    
+    for (let attempt = 1; attempt <= this.retryAttempts; attempt++) {
+      try {
+        return await operation();
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        console.error(`FileStorageProvider: ${operationName} failed (attempt ${attempt}/${this.retryAttempts}):`, lastError);
+        
+        if (attempt < this.retryAttempts) {
+          const delay = this.retryDelay * Math.pow(2, attempt - 1); // Exponential backoff
+          console.log(`FileStorageProvider: Retrying ${operationName} in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
       }
     }
+    
+    throw lastError || new Error(`Failed to ${operationName} after ${this.retryAttempts} attempts`);
   }
 
   async saveJob(job: JobStatus): Promise<void> {
@@ -213,9 +336,37 @@ export class FileStorageProvider implements StorageProvider {
     const jobPath = path.join(this.jobsDir, `${job.id}.json`);
     
     try {
-      await fs.promises.writeFile(jobPath, JSON.stringify(job, null, 2));
+      console.log(`FileStorageProvider: Saving job ${job.id} to ${jobPath}`);
+      console.log(`FileStorageProvider: Job data:`, JSON.stringify(job, null, 2));
+      
+      // Use retry mechanism for saving
+      await this.retryOperation(
+        async () => {
+          await fs.promises.writeFile(jobPath, JSON.stringify(job, null, 2));
+          
+          // Verify the file was written
+          if (!fs.existsSync(jobPath)) {
+            throw new Error(`Job file was not created at ${jobPath}`);
+          }
+          
+          const fileStats = fs.statSync(jobPath);
+          if (fileStats.size === 0) {
+            throw new Error(`Job file was created but is empty`);
+          }
+          
+          console.log(`FileStorageProvider: Job file verification:`, {
+            exists: true,
+            size: fileStats.size,
+            created: fileStats.birthtime,
+            modified: fileStats.mtime
+          });
+        },
+        `save job ${job.id}`
+      );
+      
+      console.log(`FileStorageProvider: Job ${job.id} saved successfully`);
     } catch (error) {
-      console.error(`Error saving job ${job.id}:`, error);
+      console.error(`FileStorageProvider: Error saving job ${job.id}:`, error);
       throw new Error(`Failed to save job: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -224,32 +375,54 @@ export class FileStorageProvider implements StorageProvider {
     this.ensureJobsDir();
     const jobPath = path.join(this.jobsDir, `${jobId}.json`);
     
-    // Add debug logging
-    console.log(`Storage: Checking for job file at: ${jobPath}`);
-    console.log(`Storage: File exists: ${fs.existsSync(jobPath)}`);
-    
     try {
       if (!fs.existsSync(jobPath)) {
-        console.log(`Storage: Job file not found: ${jobPath}`);
-        // List all files in the directory for debugging
-        console.log(`Storage: Files in directory: ${fs.readdirSync(this.jobsDir)}`);
+        console.log(`File Storage: Job file not found: ${jobPath}`);
         return null;
       }
       
-      const jobData = await fs.promises.readFile(jobPath, 'utf8');
-      console.log(`Storage: Job data read, length: ${jobData.length}`);
-      const job = JSON.parse(jobData) as JobStatus;
+      console.log(`File Storage: Reading job file: ${jobPath}`);
+      
+      // Use retry mechanism for reading
+      const jobData = await this.retryOperation(
+        async () => {
+          const data = await fs.promises.readFile(jobPath, 'utf8');
+          if (!data || data.trim() === '') {
+            throw new Error(`Job file is empty or contains only whitespace`);
+          }
+          return data;
+        },
+        `read job ${jobId}`
+      );
+      
+      let job: JobStatus;
+      try {
+        job = JSON.parse(jobData) as JobStatus;
+      } catch (parseError) {
+        console.error(`File Storage: Error parsing job JSON for ${jobId}:`, parseError);
+        // Try to recover by reading the raw file for debugging
+        const debugInfo = await this.debugJobFile(jobId);
+        console.error(`File Storage: Debug info for corrupted job file:`, debugInfo);
+        return null;
+      }
+      
+      // Validate job structure
+      if (!job.id || !job.status) {
+        console.error(`File Storage: Job ${jobId} has invalid structure:`, job);
+        return null;
+      }
       
       // Check if job has expired
       if (job.expiresAt && job.expiresAt < Date.now()) {
-        console.log(`Storage: Job ${jobId} has expired at ${new Date(job.expiresAt).toISOString()}`);
+        console.log(`File Storage: Job ${jobId} has expired at ${new Date(job.expiresAt).toISOString()}`);
+        await this.deleteJob(jobId);
         return null;
       }
       
-      console.log(`Storage: Successfully retrieved job ${jobId} with status: ${job.status}`);
+      console.log(`File Storage: Successfully retrieved job ${jobId} with status: ${job.status}`);
       return job;
     } catch (error) {
-      console.error(`Storage: Error reading job ${jobId}:`, error);
+      console.error(`File Storage: Error reading job ${jobId}:`, error);
       return null;
     }
   }
@@ -258,22 +431,29 @@ export class FileStorageProvider implements StorageProvider {
     this.ensureJobsDir();
     
     try {
+      console.log(`File Storage: Listing all jobs in ${this.jobsDir}`);
       const files = await fs.promises.readdir(this.jobsDir);
       const jobs: JobStatus[] = [];
       
       for (const file of files) {
         if (file.endsWith('.json')) {
           const jobId = file.replace('.json', '');
-          const job = await this.getJob(jobId);
-          if (job) {
-            jobs.push(job);
+          try {
+            const job = await this.getJob(jobId);
+            if (job) {
+              jobs.push(job);
+            }
+          } catch (error) {
+            console.error(`File Storage: Error processing job file ${file}:`, error);
+            // Continue with other files even if one fails
           }
         }
       }
       
+      console.log(`File Storage: Found ${jobs.length} jobs`);
       return jobs;
     } catch (error) {
-      console.error('Error listing jobs:', error);
+      console.error('File Storage: Error listing jobs:', error);
       return [];
     }
   }
@@ -283,13 +463,30 @@ export class FileStorageProvider implements StorageProvider {
     const jobPath = path.join(this.jobsDir, `${jobId}.json`);
     
     try {
-      if (fs.existsSync(jobPath)) {
-        await fs.promises.unlink(jobPath);
-        return true;
+      if (!fs.existsSync(jobPath)) {
+        console.log(`File Storage: Job file not found for deletion: ${jobPath}`);
+        return false;
       }
-      return false;
+      
+      console.log(`File Storage: Deleting job file: ${jobPath}`);
+      
+      // Use retry mechanism for deletion
+      await this.retryOperation(
+        async () => {
+          await fs.promises.unlink(jobPath);
+          
+          // Verify the file was deleted
+          if (fs.existsSync(jobPath)) {
+            throw new Error(`Job file still exists after deletion attempt`);
+          }
+        },
+        `delete job ${jobId}`
+      );
+      
+      console.log(`File Storage: Job ${jobId} deleted successfully`);
+      return true;
     } catch (error) {
-      console.error(`Error deleting job ${jobId}:`, error);
+      console.error(`File Storage: Error deleting job ${jobId}:`, error);
       return false;
     }
   }
@@ -298,8 +495,10 @@ export class FileStorageProvider implements StorageProvider {
     this.ensureJobsDir();
     
     try {
+      console.log(`File Storage: Cleaning up expired jobs in ${this.jobsDir}`);
       const files = await fs.promises.readdir(this.jobsDir);
       let deletedCount = 0;
+      let errorCount = 0;
       
       for (const file of files) {
         if (file.endsWith('.json')) {
@@ -308,169 +507,82 @@ export class FileStorageProvider implements StorageProvider {
           
           try {
             const jobData = await fs.promises.readFile(jobPath, 'utf8');
-            const job = JSON.parse(jobData) as JobStatus;
+            let job: JobStatus;
+            
+            try {
+              job = JSON.parse(jobData) as JobStatus;
+            } catch (parseError) {
+              console.error(`File Storage: Error parsing job file ${file} during cleanup:`, parseError);
+              errorCount++;
+              continue;
+            }
             
             if (job.expiresAt && job.expiresAt < Date.now()) {
-              await fs.promises.unlink(jobPath);
-              deletedCount++;
+              try {
+                await fs.promises.unlink(jobPath);
+                deletedCount++;
+                console.log(`File Storage: Deleted expired job ${jobId}`);
+              } catch (deleteError) {
+                console.error(`File Storage: Error deleting expired job ${jobId}:`, deleteError);
+                errorCount++;
+              }
             }
           } catch (error) {
-            console.error(`Error processing job file ${file}:`, error);
+            console.error(`File Storage: Error processing job file ${file} during cleanup:`, error);
+            errorCount++;
           }
         }
       }
       
+      console.log(`File Storage: Cleaned up ${deletedCount} expired jobs (${errorCount} errors encountered)`);
       return deletedCount;
     } catch (error) {
-      console.error('Error cleaning up expired jobs:', error);
+      console.error('File Storage: Error cleaning up expired jobs:', error);
       return 0;
     }
   }
 }
 
-// Memory-based storage provider (for testing or development)
-export class MemoryStorageProvider implements StorageProvider {
-  private jobs: Map<string, JobStatus> = new Map();
-  private maxAge: number;
-
-  constructor(maxAge: number = 24 * 60 * 60 * 1000) { // Default: 24 hours
-    this.maxAge = maxAge;
-  }
-
-  async saveJob(job: JobStatus): Promise<void> {
-    // Set expiration time if not already set
-    if (!job.expiresAt) {
-      job.expiresAt = Date.now() + this.maxAge;
-    }
-    
-    this.jobs.set(job.id, job);
-  }
-
-  async getJob(jobId: string): Promise<JobStatus | null> {
-    const job = this.jobs.get(jobId);
-    
-    if (!job) {
-      return null;
-    }
-    
-    // Check if job has expired
-    if (job.expiresAt && job.expiresAt < Date.now()) {
-      this.jobs.delete(jobId);
-      return null;
-    }
-    
-    return job;
-  }
-
-  async listJobs(): Promise<JobStatus[]> {
-    const now = Date.now();
-    const jobs: JobStatus[] = [];
-    
-    // Convert Map entries to array before iterating
-    const entries = Array.from(this.jobs.entries());
-    for (const [id, job] of entries) {
-      if (!job.expiresAt || job.expiresAt >= now) {
-        jobs.push(job);
-      } else {
-        // Remove expired job
-        this.jobs.delete(id);
-      }
-    }
-    
-    return jobs;
-  }
-
-  async deleteJob(jobId: string): Promise<boolean> {
-    return this.jobs.delete(jobId);
-  }
-
-  async cleanupExpiredJobs(): Promise<number> {
-    const now = Date.now();
-    let deletedCount = 0;
-    
-    // Convert Map entries to array before iterating
-    const entries = Array.from(this.jobs.entries());
-    for (const [id, job] of entries) {
-      if (job.expiresAt && job.expiresAt < now) {
-        this.jobs.delete(id);
-        deletedCount++;
-      }
-    }
-    
-    return deletedCount;
-  }
-}
-
-// Factory function to create the appropriate storage provider
-export function createStorageProvider(): StorageProvider {
-  // Get storage configuration from environment variables
-  const storageType = process.env.JOB_STORAGE_TYPE || 'kv';
-  const maxAge = parseInt(process.env.JOB_MAX_AGE || '86400000', 10); // Default: 24 hours
-  
-  console.log(`Initializing ${storageType} storage provider`);
-  
-  // Check if we're in a Netlify environment
+// Factory function to get the appropriate storage provider
+export function getStorageProvider(): StorageProvider {
+  const storageType = process.env.JOB_STORAGE_TYPE || 'memory';
+  const maxAge = parseInt(process.env.JOB_MAX_AGE || '86400000', 10);
   const isNetlify = process.env.NETLIFY === 'true';
-  console.log(`Environment: ${isNetlify ? 'Netlify' : 'Local development'}`);
-  
-  // Check if Netlify Blobs is configured
-  const hasBlobsConfig = !!(process.env.NETLIFY_SITE_ID && process.env.NETLIFY_ACCESS_TOKEN);
-  console.log(`Netlify Blobs configuration: ${hasBlobsConfig ? 'Available' : 'Missing'}`);
-  
+  const isDev = process.env.NODE_ENV === 'development';
+
+  console.log(`Initializing storage provider: type=${storageType}, isNetlify=${isNetlify}, isDev=${isDev}`);
+
   try {
-    switch (storageType.toLowerCase()) {
-      case 'kv':
-        if (isNetlify && !hasBlobsConfig) {
-          console.warn('Netlify Blobs configuration missing. Falling back to memory storage.');
-          return new MemoryStorageProvider(maxAge);
-        }
-        return new KVStorageProvider(maxAge);
-      case 'memory':
-        return new MemoryStorageProvider(maxAge);
-      case 'file':
-        if (isNetlify) {
-          console.warn('File storage is not reliable in Netlify Functions. Using memory storage instead.');
-          return new MemoryStorageProvider(maxAge);
-        }
-        return new FileStorageProvider('/tmp/jobs', maxAge);
-      default:
-        if (isNetlify && !hasBlobsConfig) {
-          console.warn('Netlify Blobs configuration missing. Falling back to memory storage.');
-          return new MemoryStorageProvider(maxAge);
-        }
-        return new KVStorageProvider(maxAge);
+    if (storageType === 'kv' && isNetlify) {
+      console.log('Using KV storage provider in Netlify environment');
+      return new KVStorageProvider(maxAge);
+    } else if (storageType === 'kv' && !isNetlify) {
+      console.log('KV storage requested but not in Netlify environment, falling back to file storage');
     }
   } catch (error) {
-    console.error('Error initializing storage provider:', error);
-    console.log('Falling back to memory storage provider');
-    return new MemoryStorageProvider(maxAge);
+    console.warn('Failed to initialize KV storage, falling back to file storage:', error);
   }
-}
 
-// Singleton instance of the storage provider
-let storageProvider: StorageProvider | null = null;
-
-// Get the storage provider instance
-export function getStorageProvider(): StorageProvider {
-  if (!storageProvider) {
-    try {
-      storageProvider = createStorageProvider();
-      console.log('Storage provider initialized successfully');
-    } catch (error) {
-      console.error('Failed to initialize storage provider:', error);
-      console.log('Falling back to memory storage provider');
-      storageProvider = new MemoryStorageProvider();
-    }
+  // Use file storage for local development to persist jobs between function calls
+  if (isDev) {
+    console.log('Development environment detected, using file storage');
+    const jobsDir = path.join(process.cwd(), '.netlify', 'jobs');
+    return new FileStorageProvider(jobsDir, maxAge);
   }
-  return storageProvider;
+
+  // Fallback to memory storage for other environments
+  console.log('Using memory storage provider');
+  return new MemoryStorageProvider();
 }
 
 // Helper function to create a new job
-export function createJob(): JobStatus {
+export function createJob(markdown?: string, fileName?: string): JobStatus {
   return {
     id: uuidv4(),
     status: 'pending',
-    createdAt: Date.now(),
-    updatedAt: Date.now()
+    markdown,
+    fileName,
+    createdAt: Date.now().toString(),
+    updatedAt: Date.now().toString()
   };
 } 

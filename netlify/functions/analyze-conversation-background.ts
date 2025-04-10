@@ -4,6 +4,62 @@ import fs from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { getStorageProvider, JobStatus } from '../../app/utils/storage';
+import { getPerformanceLevelFromScore } from '../../app/utils/validation';
+
+// Timeout constants in milliseconds
+const TIMEOUTS = {
+  JOB_PROCESSING: 300000, // 5 minutes for entire job processing
+  CLAUDE_API: 120000,     // 2 minutes for Claude API call
+  STORAGE: 30000,         // 30 seconds for storage operations
+  RETRY_DELAY: 1000       // 1 second delay between retries
+};
+
+// Add rate limiting constants
+const RATE_LIMIT = {
+  MAX_REQUESTS_PER_MINUTE: 10,
+  REQUEST_WINDOW_MS: 60000, // 1 minute
+  lastRequestTime: 0
+};
+
+/**
+ * Utility function to wrap a promise with a timeout
+ * @param promise The promise to wrap
+ * @param timeoutMs Timeout in milliseconds
+ * @param operationName Name of the operation for logging
+ * @param jobId Job ID for logging context
+ * @returns The result of the promise
+ * @throws Error if the operation times out
+ */
+async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  operationName: string,
+  jobId: string
+): Promise<T> {
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    setTimeout(() => {
+      reject(new Error(`${operationName} timed out after ${timeoutMs}ms for job ${jobId}`));
+    }, timeoutMs);
+  });
+
+  return Promise.race([promise, timeoutPromise]);
+}
+
+// Validate required environment variables
+const validateEnvironment = (): { isValid: boolean; missingVars: string[] } => {
+  const requiredVars = [
+    'CLAUDE_API_KEY',
+    'JOB_STORAGE_TYPE',
+    'JOB_MAX_AGE'
+  ];
+
+  const missingVars = requiredVars.filter(varName => !process.env[varName]);
+  
+  return {
+    isValid: missingVars.length === 0,
+    missingVars
+  };
+};
 
 // Add diagnostic logging
 console.log('Background function: Starting with environment:', {
@@ -117,10 +173,45 @@ const getJob = (jobId: string): JobStatus | null => {
   }
 };
 
+// Remove the local file system functions since we're using the storage provider
+const storage = getStorageProvider();
+
 // Initialize the Anthropic client
 const anthropic = new Anthropic({
-  apiKey: process.env.CLAUDE_API_KEY,
+  apiKey: process.env.CLAUDE_API_KEY || '',
 });
+
+// Add a function to check if we're in development mode
+const isDevelopmentMode = () => {
+  return process.env.NODE_ENV === 'development' || process.env.NETLIFY_DEV === 'true';
+};
+
+// Add a function to get the API key with fallback for development
+const getClaudeApiKey = () => {
+  const apiKey = process.env.CLAUDE_API_KEY;
+  
+  // Log API key status (without exposing the actual key)
+  if (apiKey) {
+    console.log(`[${new Date().toISOString()}] Claude API: API key found (length: ${apiKey.length})`);
+    // Check if the key has the expected format
+    if (apiKey.startsWith('sk-ant-')) {
+      console.log(`[${new Date().toISOString()}] Claude API: API key format looks valid`);
+    } else {
+      console.warn(`[${new Date().toISOString()}] Claude API: WARNING - API key format may be invalid (should start with 'sk-ant-')`);
+    }
+  } else {
+    console.warn(`[${new Date().toISOString()}] Claude API: WARNING - API key not found in environment variables`);
+    
+    // For development mode, provide a more helpful error message
+    if (isDevelopmentMode()) {
+      console.warn(`[${new Date().toISOString()}] Claude API: WARNING - Running in development mode without API key`);
+      console.warn(`[${new Date().toISOString()}] Claude API: WARNING - Please set CLAUDE_API_KEY in your .env.local file`);
+      console.warn(`[${new Date().toISOString()}] Claude API: WARNING - Example: CLAUDE_API_KEY=sk-ant-api03-...`);
+    }
+  }
+  
+  return apiKey;
+};
 
 // Embedded rubric and example evaluation
 const EMBEDDED_RUBRIC = `# Wine Sales Performance Rubric
@@ -340,19 +431,44 @@ const EMBEDDED_EVALUATION_EXAMPLE = {
   ]
 };
 
-// Load the rubric with caching
-const loadRubric = () => {
-  console.log('Background function: Loading rubric, cached:', !!cachedRubric);
+// Function to load the rubric from the markdown file
+async function loadRubric(): Promise<string> {
+  console.log('Loading rubric from markdown file');
   
+  // Check if we have a cached version
   if (cachedRubric) {
-    console.log('Background function: Using cached rubric');
+    console.log('Using cached rubric');
     return cachedRubric;
   }
   
-  console.log('Background function: Using embedded rubric');
-  cachedRubric = EMBEDDED_RUBRIC;
-  return cachedRubric;
-};
+  try {
+    // Try to read the rubric from the markdown file
+    const rubricPath = path.join(process.cwd(), 'public', 'data', 'wines_sales_rubric.md');
+    console.log(`Looking for rubric at: ${rubricPath}`);
+    
+    if (fs.existsSync(rubricPath)) {
+      console.log('Rubric file found, reading contents');
+      const rubricContent = fs.readFileSync(rubricPath, 'utf8');
+      console.log(`Loaded rubric with ${rubricContent.length} characters`);
+      console.log(`Rubric content preview: ${rubricContent.substring(0, 200)}...`);
+      
+      // Cache the rubric for future use
+      cachedRubric = rubricContent;
+      return rubricContent;
+    } else {
+      console.log('Rubric file not found, using embedded rubric');
+      console.log(`Current working directory: ${process.cwd()}`);
+      console.log(`Directory contents: ${fs.readdirSync(process.cwd()).join(', ')}`);
+      console.log(`Public directory contents: ${fs.existsSync(path.join(process.cwd(), 'public')) ? fs.readdirSync(path.join(process.cwd(), 'public')).join(', ') : 'Public directory not found'}`);
+      console.log(`Data directory contents: ${fs.existsSync(path.join(process.cwd(), 'public', 'data')) ? fs.readdirSync(path.join(process.cwd(), 'public', 'data')).join(', ') : 'Data directory not found'}`);
+      return EMBEDDED_RUBRIC;
+    }
+  } catch (error) {
+    console.error('Error loading rubric:', error);
+    console.log('Using embedded rubric as fallback');
+    return EMBEDDED_RUBRIC;
+  }
+}
 
 // Load the example evaluation with caching
 const loadEvaluationExample = () => {
@@ -381,7 +497,7 @@ interface EvaluationData {
   date: string;
   overallScore: number;
   totalScore?: number; // Optional field that might be used instead of overallScore
-  performanceLevel: string;
+  performanceLevel: 'Exceptional' | 'Strong' | 'Proficient' | 'Developing' | 'Needs Improvement';
   criteriaScores: CriteriaScore[];
   strengths: string[];
   areasForImprovement: string[];
@@ -575,8 +691,15 @@ function validateAndRepairEvaluationData(data: any, markdown: string): Evaluatio
     const totalWeightedScore = fallbackData.criteriaScores.reduce((sum, criterion) => {
       return sum + criterion.weightedScore;
     }, 0);
-    fallbackData.overallScore = Math.round((totalWeightedScore / 500) * 100);
-    console.log(`Calculated overall score: ${fallbackData.overallScore}`);
+    
+    // Calculate the total possible score (sum of all weights)
+    const totalPossibleScore = fallbackData.criteriaScores.reduce((sum, criterion) => {
+      return sum + criterion.weight;
+    }, 0);
+    
+    // Calculate the overall score as a percentage
+    fallbackData.overallScore = Math.round((totalWeightedScore / totalPossibleScore) * 100);
+    console.log(`Calculated overall score: ${fallbackData.overallScore}% (${totalWeightedScore}/${totalPossibleScore})`);
   }
   
   // Set performance level based on overall score
@@ -691,7 +814,8 @@ async function performBasicEvaluation(markdown: string): Promise<any> {
   
   // Calculate overall score
   const totalWeightedScore = criteriaScores.reduce((sum, c) => sum + c.weightedScore, 0);
-  const overallScore = Math.round((totalWeightedScore / 500) * 100);
+  const totalPossibleScore = criteriaScores.reduce((sum, c) => sum + c.weight, 0);
+  const overallScore = Math.round((totalWeightedScore / totalPossibleScore) * 100);
   
   // Determine performance level
   let performanceLevel = "Needs Improvement";
@@ -740,279 +864,164 @@ const truncateConversation = (markdown: string, maxLength: number = 8000): strin
   return `[Note: Conversation truncated for analysis. Showing middle section.]\n\n${truncated}\n\n[End of truncated conversation]`;
 };
 
-// Process a job
-const processJob = async (job: JobStatus, markdown: string, fileName: string) => {
-  console.log(`Background function: Processing job ${job.id}`);
-  
-  // Get the storage provider
-  const storage = getStorageProvider();
-  
-  try {
-    // Load the rubric and example eval using the cached versions
-    const WINES_SALES_RUBRIC = loadRubric();
-    const EVALUATION_EXAMPLE = loadEvaluationExample();
-    
-    // Truncate conversation if needed
-    const truncatedMarkdown = truncateConversation(markdown);
-    
-    // Prepare the system prompt for Claude - updated to be more explicit about JSON output and detailed feedback
-    const systemPrompt = `You are a wine sales performance evaluator. Your task is to analyze the conversation and output ONLY a valid JSON object with no additional text or explanations. 
-    
-IMPORTANT INSTRUCTIONS:
-1. Output ONLY valid JSON that can be directly parsed by JSON.parse()
-2. Do not include any markdown formatting, text before or after the JSON
-3. Do not include any explanations or comments outside the JSON
-4. Follow the exact structure in the example provided
-5. Ensure all required fields are present and correctly formatted
-
-For each criterion, you MUST:
-1. Quote specific examples from the conversation that demonstrate performance
-2. Explain what was done well and why it was effective, with concrete examples
-3. Identify specific areas for improvement with actionable suggestions
-4. Provide a fair score (1-5) based on the evidence
-5. Include detailed notes that explain your scoring rationale
-
-For each criterion, your notes should:
-- Start with "Strengths:" followed by specific examples and why they were effective
-- Then "Areas for Improvement:" with concrete suggestions
-- End with "Score Rationale:" explaining why you gave that score
-
-Be thorough but concise in your analysis. Focus on actionable feedback that will help the staff member improve.`;
-
-    // Prepare the user prompt with a more structured JSON schema and detailed feedback requirements
-    const userPrompt = `Evaluate this wine tasting conversation against the provided rubric. Return ONLY a JSON object with the following structure:
-
-{
-  "staffName": "string", // Extract from conversation
-  "date": "YYYY-MM-DD", // From conversation, in this format
-  "overallScore": number, // Calculate as a percentage (0-100)
-  "performanceLevel": "string", // Based on the score ranges
-  "criteriaScores": [
-    {
-      "criterion": "string", // Exactly as in the rubric
-      "weight": number, // As per the rubric
-      "score": number, // Your rating (1-5)
-      "weightedScore": number, // score × weight
-      "notes": "string" // Your detailed analysis including specific examples, strengths, and areas for improvement
-    },
-    // Exactly 10 criteria as in the rubric
-  ],
-  "strengths": ["string", "string", "string"], // Exactly 3 strengths
-  "areasForImprovement": ["string", "string", "string"], // Exactly 3 areas
-  "keyRecommendations": ["string", "string", "string"] // Exactly 3 recommendations
+interface EvaluationResult {
+  staffName: string;
+  date: string;
+  overallScore: number;
+  performanceLevel: 'Exceptional' | 'Strong' | 'Proficient' | 'Developing' | 'Needs Improvement';
+  criteriaScores: {
+    criterion: string;
+    score: number;
+    weight: number;
+    weightedScore: number;
+    notes: string;
+  }[];
+  strengths: string[];
+  areasForImprovement: string[];
+  keyRecommendations: string[];
 }
 
-Rubric:
-${WINES_SALES_RUBRIC}
+// Function to enforce rate limiting
+async function enforceRateLimit() {
+  const now = Date.now();
+  const timeSinceLastRequest = now - RATE_LIMIT.lastRequestTime;
+  
+  if (timeSinceLastRequest < RATE_LIMIT.REQUEST_WINDOW_MS / RATE_LIMIT.MAX_REQUESTS_PER_MINUTE) {
+    const delayMs = (RATE_LIMIT.REQUEST_WINDOW_MS / RATE_LIMIT.MAX_REQUESTS_PER_MINUTE) - timeSinceLastRequest;
+    console.log(`Rate limiting: Waiting ${delayMs}ms before next request`);
+    await new Promise(resolve => setTimeout(resolve, delayMs));
+  }
+  
+  RATE_LIMIT.lastRequestTime = Date.now();
+}
 
-Example format:
-${EVALUATION_EXAMPLE}
+// Function to analyze conversation with Claude API
+async function analyzeConversationWithClaude(
+  conversation: string,
+  staffName: string,
+  date: string
+): Promise<EvaluationResult> {
+  console.log('Starting conversation analysis with Claude');
+  
+  // Validate environment variables
+  const envCheck = validateEnvironment();
+  if (!envCheck.isValid) {
+    console.error('Missing required environment variables:', envCheck.missingVars);
+    throw new Error(`Missing required environment variables: ${envCheck.missingVars.join(', ')}`);
+  }
+  
+  // Check API key
+  const apiKey = getClaudeApiKey();
+  if (!apiKey) {
+    throw new Error('Claude API key is missing. Please set CLAUDE_API_KEY in your environment variables.');
+  }
+  
+  // Load the rubric
+  const rubric = await loadRubric();
+  console.log('Loaded rubric for analysis');
+  
+  // Prepare the prompt
+  const prompt = `You are an expert wine sales trainer evaluating a conversation between a winery staff member and a guest.
 
-Instructions:
-1. Score each criterion 1-5 based on rubric
-2. Calculate weighted scores (score × weight)
-3. Calculate overall score (sum of weighted scores ÷ 5)
-4. Determine performance level:
-   - Exceptional: 90-100%
-   - Strong: 80-89%
-   - Proficient: 70-79%
-   - Developing: 60-69%
-   - Needs Improvement: <60%
-5. Include 3 strengths, 3 areas for improvement, 3 recommendations
-6. Write detailed notes for each criterion that include:
-   - Specific examples from the conversation
-   - What was done well and why it was effective
-   - What could be improved with concrete suggestions
-   - A fair score based on the evidence
+IMPORTANT INSTRUCTIONS:
+1. Use the EXACT criteria and scoring guidelines from the rubric below
+2. For each criterion, provide a score (1-5) and detailed justification
+3. Calculate the weighted score for each criterion using the weights specified
+4. Determine the overall performance level based on the total weighted score
+5. Provide specific examples from the conversation to support your evaluation
 
-Conversation to evaluate:
-${truncatedMarkdown}
+RUBRIC:
+${rubric}
 
-Return ONLY THE JSON with no additional text. The JSON must match the example format exactly.`;
+CONVERSATION TO EVALUATE:
+${conversation}
+
+STAFF MEMBER: ${staffName}
+DATE: ${date}
+
+Please provide your evaluation in the following JSON format:
+{
+  "staffName": "${staffName}",
+  "date": "${date}",
+  "overallScore": number,
+  "performanceLevel": "Exceptional" | "Strong" | "Proficient" | "Developing" | "Needs Improvement",
+  "criteriaScores": [
+    {
+      "criterion": string,
+      "score": number,
+      "weight": number,
+      "weightedScore": number,
+      "notes": string
+    }
+  ],
+  "strengths": string[],
+  "areasForImprovement": string[],
+  "keyRecommendations": string[]
+}`;
+
+  try {
+    // Enforce rate limiting before making the API call
+    await enforceRateLimit();
     
-    // Save debug info before calling Claude
-    saveDebugInfo(job.id, 'request', {
-      model: "claude-3-7-sonnet-20250219",
-      system: systemPrompt,
-      userPrompt: userPrompt.substring(0, 1000) + '...' // Truncate for logs
-    });
-    
-    console.log('Background function: Calling Claude API');
-    
-    // Call Claude API with Claude 3 Sonnet
-    const anthropic = new Anthropic({
-      apiKey: process.env.CLAUDE_API_KEY || '',
-    });
-    
+    console.log('Sending request to Claude API');
     const response = await anthropic.messages.create({
-      model: "claude-3-7-sonnet-20250219",
+      model: 'claude-3-7-sonnet-20250219',
       max_tokens: 4000,
-      system: systemPrompt,
+      temperature: 0,
       messages: [
         {
-          role: "user",
-          content: userPrompt
+          role: 'user',
+          content: prompt
         }
-      ],
-      temperature: 0.1
+      ]
     });
     
-    console.log('Background function: Claude API response received');
+    console.log('Received response from Claude API');
+    const result = response.content[0].text;
+    console.log('Processing Claude response');
     
-    // Get the response text
-    const responseText = response.content[0].text;
-    
-    if (!responseText) {
-      throw new Error('Empty response from Claude API');
-    }
-    
-    // Save debug info after getting Claude's response
-    saveDebugInfo(job.id, 'response', {
-      responseText: responseText.substring(0, 5000) + '...' // Truncate for logs
-    });
-    
-    console.log('Background function: Extracting JSON from Claude response');
-    // Extract JSON from Claude's response
-    let evaluationData: EvaluationData;
     try {
-      // Process the response to extract JSON
-      const processedText = processCloudeResponse(responseText);
-      console.log('Background function: Processed Claude response');
-      
-      // Try to parse the JSON
+      // First try to parse the response directly
+      let evaluation;
       try {
-        evaluationData = JSON.parse(processedText) as EvaluationData;
-        console.log('Background function: Successfully parsed JSON');
+        evaluation = JSON.parse(result);
       } catch (parseError) {
-        console.error('Background function: Error parsing JSON:', parseError);
-        
-        // Try to clean the text and parse again
-        const cleanedText = processedText
-          .replace(/[\u0000-\u001F\u007F-\u009F]/g, '') // Remove control characters
-          .replace(/\\n/g, ' ') // Replace escaped newlines with spaces
-          .replace(/\s+/g, ' ') // Normalize whitespace
-          .trim();
-        
-        console.log('Background function: Trying to parse cleaned text');
-        evaluationData = JSON.parse(cleanedText) as EvaluationData;
+        // If direct parsing fails, try to extract JSON from the response
+        const jsonString = processCloudeResponse(result);
+        evaluation = JSON.parse(jsonString);
       }
       
-      // Save debug info after processing the response
-      saveDebugInfo(job.id, 'processed', {
-        evaluationData: evaluationData
-      });
-      
-      // Log the structure to see what fields are present/missing
-      console.log('Background function: Parsed evaluation data structure:', Object.keys(evaluationData));
-      
-      // Validate the evaluation data structure
-      if (!evaluationData || typeof evaluationData !== 'object') {
-        console.error('Background function: Invalid evaluation data structure:', evaluationData);
-        job.status = 'failed';
-        job.error = 'Invalid evaluation data structure returned from Claude';
-        job.updatedAt = Date.now();
-        await storage.saveJob(job);
-        return;
-      }
-
-      // Ensure the evaluation data has the required fields
-      const requiredFields = ['staffName', 'date', 'overallScore', 'criteriaScores', 'strengths', 'areasForImprovement'];
-      const missingFields = requiredFields.filter(field => !(field in evaluationData));
-      
-      if (missingFields.length > 0) {
-        console.error('Background function: Missing required fields in evaluation data:', missingFields);
-        
-        // Try to repair the data structure if possible
-        const repairedData = {
-          staffName: evaluationData.staffName || 'Unknown Staff',
-          date: evaluationData.date || new Date().toISOString().split('T')[0],
-          overallScore: evaluationData.overallScore || 0,
-          criteriaScores: Array.isArray(evaluationData.criteriaScores) ? evaluationData.criteriaScores : [],
-          strengths: Array.isArray(evaluationData.strengths) ? evaluationData.strengths : [],
-          areasForImprovement: Array.isArray(evaluationData.areasForImprovement) ? evaluationData.areasForImprovement : [],
-          performanceLevel: evaluationData.performanceLevel || 'Needs Improvement',
-          keyRecommendations: Array.isArray(evaluationData.keyRecommendations) ? evaluationData.keyRecommendations : []
-        };
-        
-        // Check if we have at least some valid data
-        const hasValidData = repairedData.criteriaScores.length > 0 || 
-                            repairedData.strengths.length > 0 || 
-                            repairedData.areasForImprovement.length > 0;
-        
-        if (hasValidData) {
-          console.log('Background function: Using repaired evaluation data structure');
-          evaluationData = repairedData;
-        } else {
-          job.status = 'failed';
-          job.error = `Missing required fields in evaluation data: ${missingFields.join(', ')}`;
-          job.updatedAt = Date.now();
-          await storage.saveJob(job);
-          return;
-        }
-      }
-
-      // Ensure criteriaScores is an array
-      if (!Array.isArray(evaluationData.criteriaScores)) {
-        console.error('Background function: criteriaScores is not an array:', evaluationData.criteriaScores);
-        evaluationData.criteriaScores = [];
-      }
-
-      // Ensure strengths and areasForImprovement are arrays
-      if (!Array.isArray(evaluationData.strengths)) {
-        console.error('Background function: strengths is not an array:', evaluationData.strengths);
-        evaluationData.strengths = [];
-      }
-
-      if (!Array.isArray(evaluationData.areasForImprovement)) {
-        console.error('Background function: areasForImprovement is not an array:', evaluationData.areasForImprovement);
-        evaluationData.areasForImprovement = [];
-      }
-
-      // Calculate overall score if not provided
-      if (typeof evaluationData.overallScore !== 'number' || isNaN(evaluationData.overallScore)) {
-        console.log('Background function: Calculating overall score from criteria scores');
-        if (evaluationData.criteriaScores.length > 0) {
-          const totalScore = evaluationData.criteriaScores.reduce((sum, criteria) => {
-            return sum + (typeof criteria.score === 'number' ? criteria.score : 0);
-          }, 0);
-          evaluationData.overallScore = Math.round(totalScore / evaluationData.criteriaScores.length);
-        } else {
-          evaluationData.overallScore = 0;
-        }
-      }
-
-      // Save the job with the evaluation data
-      job.status = 'completed';
-      job.result = evaluationData;
-      job.updatedAt = Date.now();
-      await storage.saveJob(job);
-      console.log(`Background function: Job ${job.id} completed successfully`);
+      // Validate and repair the evaluation data
+      const validatedData = validateAndRepairEvaluationData(evaluation, conversation);
+      console.log('Successfully processed evaluation result');
+      return validatedData;
     } catch (error) {
-      console.error(`Background function: Error processing job ${job.id}:`, error);
-      
-      // Update job with the error
-      job.status = 'failed';
-      job.error = error instanceof Error ? error.message : 'Unknown error';
-      job.updatedAt = Date.now();
-      await storage.saveJob(job);
-      
-      throw error;
+      console.error('Error processing Claude response:', error);
+      throw new Error('Failed to process Claude response');
     }
   } catch (error) {
-    console.error(`Background function: Error processing job ${job.id}:`, error);
+    console.error('Error calling Claude API:', error);
+    if (error instanceof Error) {
+      // Check for specific error types
+      if (error.message.includes('404') || error.message.includes('not_found_error')) {
+        throw new Error('Claude API model not found. Please check your API key and model name.');
+      } else if (error.message.includes('401') || error.message.includes('unauthorized')) {
+        throw new Error('Unauthorized access to Claude API. Please check your API key.');
+      } else if (error.message.includes('429') || error.message.includes('rate_limit')) {
+        throw new Error('Rate limit exceeded for Claude API. Please try again later.');
+      }
+    }
     throw error;
   }
-};
+}
 
+// Netlify function handler
 export const handler: Handler = async (event: HandlerEvent, context: HandlerContext) => {
-  console.log('Background function: Handler started', {
-    httpMethod: event.httpMethod,
-    pathPattern: event.path,
-    hasBody: !!event.body,
-    contentLength: event.body?.length
-  });
+  console.log(`[${new Date().toISOString()}] Background function: Received request`);
   
+  // Only allow POST requests
   if (event.httpMethod !== 'POST') {
+    console.log(`[${new Date().toISOString()}] Background function: Invalid HTTP method: ${event.httpMethod}`);
     return {
       statusCode: 405,
       body: JSON.stringify({ error: 'Method not allowed' })
@@ -1020,54 +1029,95 @@ export const handler: Handler = async (event: HandlerEvent, context: HandlerCont
   }
   
   try {
-    if (!event.body) {
+    // Parse the request body
+    const { jobId, conversation, staffName, date } = JSON.parse(event.body || '{}');
+    
+    // Validate required fields
+    if (!jobId) {
+      console.log(`[${new Date().toISOString()}] Background function: Missing jobId in request`);
       return {
         statusCode: 400,
-        body: JSON.stringify({ error: 'No request body provided' })
+        body: JSON.stringify({ error: 'Missing jobId in request' })
       };
     }
     
-    const { job, markdown, fileName } = JSON.parse(event.body);
+    if (!conversation) {
+      console.log(`[${new Date().toISOString()}] Background function: Missing conversation in request`);
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ error: 'Missing conversation in request' })
+      };
+    }
     
+    // Get the job from storage
+    const job = await storage.getJob(jobId);
     if (!job) {
+      console.log(`[${new Date().toISOString()}] Background function: Job ${jobId} not found`);
       return {
-        statusCode: 400,
-        body: JSON.stringify({ error: 'No job provided' })
+        statusCode: 404,
+        body: JSON.stringify({ error: 'Job not found' })
       };
     }
-    
-    if (!markdown) {
-      return {
-        statusCode: 400,
-        body: JSON.stringify({ error: 'No markdown content provided' })
-      };
-    }
-    
-    // Get the storage provider
-    const storage = getStorageProvider();
-    
-    console.log(`Background function: Processing job ${job.id}`);
     
     // Update job status to processing
     job.status = 'processing';
-    job.updatedAt = Date.now();
+    job.updatedAt = new Date().toISOString();
     await storage.saveJob(job);
+    console.log(`[${new Date().toISOString()}] Background function: Updated job ${jobId} status to processing`);
     
-    // Process the job asynchronously
-    processJob(job, markdown, fileName).catch(error => {
-      console.error(`Background function: Unhandled error in processJob:`, error);
-    });
+    // Analyze the conversation with Claude
+    const evaluationResult = await analyzeConversationWithClaude(
+      conversation,
+      staffName,
+      date
+    );
     
-    // Return immediately to prevent timeout
+    // Update job with the evaluation result
+    job.status = 'completed';
+    job.result = evaluationResult;
+    job.updatedAt = new Date().toISOString();
+    await storage.saveJob(job);
+    console.log(`[${new Date().toISOString()}] Background function: Updated job ${jobId} status to completed`);
+    
+    // Return success response
     return {
-      statusCode: 202,
-      body: JSON.stringify({ message: 'Job processing started' })
+      statusCode: 200,
+      body: JSON.stringify({ 
+        message: 'Job processed successfully',
+        jobId: job.id
+      })
     };
-  } catch (error) {
-    console.error('Background function: Error processing request:', error);
+  } catch (error: unknown) {
+    console.error(`[${new Date().toISOString()}] Background function: Error processing request:`, error);
+    
+    // If we have a job ID, update the job status to failed
+    try {
+      const { jobId } = JSON.parse(event.body || '{}');
+      if (jobId) {
+        const job = await storage.getJob(jobId);
+        if (job) {
+          job.status = 'failed';
+          job.error = error instanceof Error ? error.message : 'Unknown error';
+          job.errorDetails = {
+            type: error instanceof Error ? error.name : 'UnknownError',
+            message: error instanceof Error ? error.message : 'Unknown error',
+            timestamp: new Date().toISOString()
+          };
+          job.updatedAt = new Date().toISOString();
+          await storage.saveJob(job);
+          console.log(`[${new Date().toISOString()}] Background function: Updated job ${jobId} status to failed`);
+        }
+      }
+    } catch (updateError) {
+      console.error(`[${new Date().toISOString()}] Background function: Error updating job status:`, updateError);
+    }
+    
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: 'Internal server error' })
+      body: JSON.stringify({ 
+        error: 'Internal server error',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      })
     };
   }
 }; 

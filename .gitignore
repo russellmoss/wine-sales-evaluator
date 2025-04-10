@@ -78,3 +78,5 @@ pids
 
 # Dashboard directory
 /dashboard/ 
+# Local Netlify folder
+.netlify

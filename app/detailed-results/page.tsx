@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { EvaluationData } from '../../types/evaluation';
+import type { EvaluationData, ObservationalNotes, ObservationalNote } from '../../types/evaluation';
 import LoadingIndicator from '../../components/LoadingIndicator';
 import PDFExport from '../../components/PDFExport';
 import BackButton from '../../components/BackButton';
@@ -321,25 +321,26 @@ export default function DetailedResultsPage() {
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Criteria Scores Overview</h2>
         
         {/* Bar Chart using Recharts */}
-        <div className="h-80">
+        <div className="h-96">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={evaluationData.criteriaScores.map(criterion => ({
-                name: criterion.criterion.split(' ')[0], // Use first word for brevity
+                name: criterion.criterion,
                 score: criterion.score,
                 fullName: criterion.criterion,
                 weight: criterion.weight,
                 notes: criterion.notes
               }))}
-              margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+              margin={{ top: 20, right: 30, left: 20, bottom: 120 }}
             >
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis 
                 dataKey="name" 
                 angle={-45} 
                 textAnchor="end" 
-                height={60}
+                height={120}
                 tick={{ fontSize: 12 }}
+                interval={0}
               />
               <YAxis 
                 domain={[0, 5]} 
@@ -355,8 +356,8 @@ export default function DetailedResultsPage() {
                         <p className="font-bold">{data.fullName}</p>
                         <p>Score: {data.score}/5</p>
                         <p>Weight: {data.weight}%</p>
-                        <p className="mt-1 text-gray-300 truncate max-w-xs">
-                          {data.notes.substring(0, 100)}...
+                        <p className="mt-1 text-gray-300">
+                          {data.notes}
                         </p>
                       </div>
                     );
@@ -401,72 +402,123 @@ export default function DetailedResultsPage() {
       {/* Detailed Criteria Scores */}
       <div className="bg-white rounded-lg shadow-md p-6 mb-8">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Detailed Criteria Analysis</h2>
-        <div className="space-y-6">
+        <div className="space-y-8">
           {evaluationData.criteriaScores.map((criterion, index) => (
             <div key={index} className="border-b border-gray-200 pb-6 last:border-b-0">
-              <div 
-                className="flex justify-between items-center cursor-pointer"
-                onClick={() => setExpandedCriterion(expandedCriterion === criterion.criterion ? null : criterion.criterion)}
-              >
+              <div className="flex justify-between items-start mb-4">
                 <div className="flex-1">
                   <h3 className="text-lg font-medium text-gray-900">{criterion.criterion}</h3>
                   <p className="text-sm text-gray-500">Weight: {criterion.weight}%</p>
                 </div>
                 <div className="flex items-center space-x-4">
-                  <span className="text-lg font-semibold text-gray-900">
+                  <span className={`text-lg font-semibold px-3 py-1 rounded ${
+                    criterion.score >= 4 ? 'bg-green-100 text-green-800' :
+                    criterion.score >= 3 ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-red-100 text-red-800'
+                  }`}>
                     {criterion.score}/5
                   </span>
                   <span className="text-sm text-gray-500">
                     ({criterion.weightedScore} points)
                   </span>
-                  <svg 
-                    className={`w-5 h-5 ml-2 transition-transform ${expandedCriterion === criterion.criterion ? 'rotate-180' : ''}`} 
-                    fill="none" 
-                    stroke="currentColor" 
-                    viewBox="0 0 24 24" 
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
-                  </svg>
                 </div>
               </div>
 
-              {expandedCriterion === criterion.criterion && (
-                <div className="mt-4 pl-4 border-l-4 border-blue-200">
-                  <div className="prose max-w-none">
-                    <h4 className="text-md font-semibold text-gray-900 mb-2">Evaluation Notes</h4>
-                    <p className="text-gray-700 mb-4">{criterion.notes}</p>
-
-                    {extractExample(criterion.notes) && (
-                      <div className="bg-gray-50 p-4 rounded-md mb-4">
-                        <h4 className="text-md font-semibold text-gray-900 mb-2">Specific Example</h4>
-                        <blockquote className="text-gray-700 italic border-l-4 border-blue-300 pl-4">
-                          "{extractExample(criterion.notes)}"
-                        </blockquote>
-                      </div>
-                    )}
-
-                    {criterion.score < 4 && (
-                      <div className="bg-yellow-50 p-4 rounded-md">
-                        <h4 className="text-md font-semibold text-gray-900 mb-2">Areas for Improvement</h4>
-                        <ul className="list-disc pl-4 space-y-2">
-                          {extractSuggestions(criterion.notes).length > 0 ? (
-                            extractSuggestions(criterion.notes).map((suggestion, idx) => (
-                              <li key={idx} className="text-gray-700">{suggestion}</li>
-                            ))
-                          ) : (
-                            <li className="text-gray-700">Review the evaluation notes for specific improvement areas.</li>
-                          )}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
+              <div className="prose max-w-none">
+                <div className="bg-gray-50 p-4 rounded-md mb-4">
+                  <h4 className="text-md font-semibold text-gray-900 mb-2">Evaluation Notes</h4>
+                  <p className="text-gray-700">{criterion.notes}</p>
                 </div>
-              )}
+
+                {extractExample(criterion.notes) && (
+                  <div className="bg-blue-50 p-4 rounded-md mb-4">
+                    <h4 className="text-md font-semibold text-gray-900 mb-2">Specific Example</h4>
+                    <blockquote className="text-gray-700 italic border-l-4 border-blue-300 pl-4">
+                      "{extractExample(criterion.notes)}"
+                    </blockquote>
+                  </div>
+                )}
+
+                {criterion.score < 4 && (
+                  <div className="bg-yellow-50 p-4 rounded-md">
+                    <h4 className="text-md font-semibold text-gray-900 mb-2">Areas for Improvement</h4>
+                    <ul className="list-disc pl-4 space-y-2">
+                      {extractSuggestions(criterion.notes).length > 0 ? (
+                        extractSuggestions(criterion.notes).map((suggestion, idx) => (
+                          <li key={idx} className="text-gray-700">{suggestion}</li>
+                        ))
+                      ) : (
+                        <li className="text-gray-700">Review the evaluation notes for specific improvement areas.</li>
+                      )}
+                    </ul>
+                  </div>
+                )}
+              </div>
             </div>
           ))}
         </div>
       </div>
+
+      {/* Observational Criteria */}
+      {evaluationData.observationalNotes && (
+        <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">Observational Criteria</h2>
+          <div className="space-y-8">
+            {(Object.entries(evaluationData.observationalNotes) as [keyof ObservationalNotes, ObservationalNote][]).map(([key, value], index) => (
+              <div key={index} className="border-b border-gray-200 pb-6 last:border-b-0">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="flex-1">
+                    <h3 className="text-lg font-medium text-gray-900">
+                      {key === 'productKnowledge' ? 'Product Knowledge' : 'Handling Objections'}
+                    </h3>
+                    <p className="text-sm text-gray-500">Observational Only (No Weight)</p>
+                  </div>
+                  <div className="flex items-center space-x-4">
+                    <span className={`text-lg font-semibold px-3 py-1 rounded ${
+                      value.score >= 4 ? 'bg-green-100 text-green-800' :
+                      value.score >= 3 ? 'bg-yellow-100 text-yellow-800' :
+                      'bg-red-100 text-red-800'
+                    }`}>
+                      {value.score}/5
+                    </span>
+                  </div>
+                </div>
+
+                <div className="prose max-w-none">
+                  <div className="bg-gray-50 p-4 rounded-md mb-4">
+                    <h4 className="text-md font-semibold text-gray-900 mb-2">Evaluation Notes</h4>
+                    <p className="text-gray-700">{value.notes}</p>
+                  </div>
+
+                  {extractExample(value.notes) && (
+                    <div className="bg-blue-50 p-4 rounded-md mb-4">
+                      <h4 className="text-md font-semibold text-gray-900 mb-2">Specific Example</h4>
+                      <blockquote className="text-gray-700 italic border-l-4 border-blue-300 pl-4">
+                        "{extractExample(value.notes)}"
+                      </blockquote>
+                    </div>
+                  )}
+
+                  {value.score < 4 && (
+                    <div className="bg-yellow-50 p-4 rounded-md">
+                      <h4 className="text-md font-semibold text-gray-900 mb-2">Areas for Improvement</h4>
+                      <ul className="list-disc pl-4 space-y-2">
+                        {extractSuggestions(value.notes).length > 0 ? (
+                          extractSuggestions(value.notes).map((suggestion, idx) => (
+                            <li key={idx} className="text-gray-700">{suggestion}</li>
+                          ))
+                        ) : (
+                          <li className="text-gray-700">Review the evaluation notes for specific improvement areas.</li>
+                        )}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Strengths */}
       <div className="bg-white rounded-lg shadow-md p-6 mb-8">

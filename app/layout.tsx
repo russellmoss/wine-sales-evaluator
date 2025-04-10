@@ -3,7 +3,12 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import { Toaster } from 'react-hot-toast';
 
-const inter = Inter({ subsets: ['latin'] });
+// Initialize the font with proper error handling
+const inter = Inter({ 
+  subsets: ['latin'],
+  display: 'swap', // Use swap to prevent FOIT (Flash of Invisible Text)
+  fallback: ['system-ui', 'arial'], // Provide fallback fonts
+});
 
 export const metadata: Metadata = {
   title: 'Wine Sales Evaluator',
@@ -17,7 +22,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={inter.className}>
+      <body className={inter?.className || ''}>
         {children}
         <Toaster position="top-right" />
       </body>

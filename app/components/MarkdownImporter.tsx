@@ -42,6 +42,59 @@ const MarkdownImporter: FC<MarkdownImporterProps> = ({ onAnalysisComplete, isAna
       setError(null);
       setJobId(null);
 
+      // Check if we should use direct evaluation (for development or if env var is set)
+      const useDirectEvaluation = process.env.NEXT_PUBLIC_USE_DIRECT_EVALUATION === 'true' || 
+                                  process.env.NODE_ENV === 'development';
+      
+      if (useDirectEvaluation) {
+        console.log('Using direct evaluation mode (development or env var set)');
+        toast('Using direct evaluation mode (no background processing)');
+        
+        // Call the direct evaluation endpoint
+        const response = await fetch('/.netlify/functions/analyze-conversation', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            markdown: markdown,
+            fileName: fileName,
+            directEvaluation: true
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || `Error: ${response.status}`);
+        }
+
+        const { result } = await response.json();
+        
+        if (!result) {
+          throw new Error('No result returned from direct evaluation');
+        }
+        
+        // Validate the evaluation data structure
+        const validationResult = validateEvaluationData(result);
+        if (!validationResult.isValid) {
+          console.warn('Validation issues found:', validationResult.errors);
+          toast.error('The evaluation data has some issues, but we\'ll try to use it anyway');
+        }
+        
+        // Use the validated data
+        onAnalysisComplete(validationResult.data);
+        toast.success('Conversation analyzed successfully!');
+        
+        // Reset the form
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+        setMarkdown(null);
+        setFileName('');
+        
+        return;
+      }
+
       // Start the analysis job
       const response = await fetch('/.netlify/functions/analyze-conversation', {
         method: 'POST',
@@ -75,8 +128,10 @@ const MarkdownImporter: FC<MarkdownImporterProps> = ({ onAnalysisComplete, isAna
       let completed = false;
       let result = null;
       let retryCount = 0;
+      const startTime = Date.now();
+      const MAX_POLLING_TIME = 300000; // 300 seconds max polling time
       
-      while (!completed && retryCount < 20) { // Limit retries to avoid infinite loop
+      while (!completed && retryCount < 20 && (Date.now() - startTime) < MAX_POLLING_TIME) {
         // Wait 3 seconds between polls
         await new Promise(resolve => setTimeout(resolve, 3000));
         
@@ -114,7 +169,34 @@ const MarkdownImporter: FC<MarkdownImporterProps> = ({ onAnalysisComplete, isAna
       }
       
       if (!completed) {
-        throw new Error('Analysis timed out after multiple retries');
+        console.error(`Job polling timed out after ${(Date.now() - startTime) / 1000} seconds`);
+        
+        // Try direct evaluation as a fallback
+        toast('Background job timed out. Trying direct evaluation...');
+        
+        const directResponse = await fetch('/.netlify/functions/analyze-conversation', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            markdown: markdown,
+            fileName: fileName,
+            directEvaluation: true
+          }),
+        });
+
+        if (!directResponse.ok) {
+          throw new Error('Direct evaluation also failed');
+        }
+
+        const { result: directResult } = await directResponse.json();
+        
+        if (!directResult) {
+          throw new Error('No result returned from direct evaluation');
+        }
+        
+        result = directResult;
       }
       
       if (!result) {

@@ -10,12 +10,13 @@ export interface CriterionScore {
 export type WineEvaluation = EvaluationData;
 
 export interface ObservationalNote {
-  criterion: string;
+  score: number;
   notes: string;
 }
 
 export interface ObservationalNotes {
-  notes: ObservationalNote[];
+  productKnowledge: ObservationalNote;
+  handlingObjections: ObservationalNote;
 }
 
 export interface EvaluationData {
@@ -27,6 +28,7 @@ export interface EvaluationData {
   strengths: string[];
   areasForImprovement: string[];
   keyRecommendations: string[];
+  observationalNotes: ObservationalNotes;
 }
 
 export type PerformanceLevel = 'Exceptional' | 'Strong' | 'Proficient' | 'Developing' | 'Needs Improvement';
@@ -112,6 +114,10 @@ export function createEmptyEvaluation(): EvaluationData {
     criteriaScores,
     strengths: [],
     areasForImprovement: [],
-    keyRecommendations: []
+    keyRecommendations: [],
+    observationalNotes: {
+      productKnowledge: { score: 0, notes: '' },
+      handlingObjections: { score: 0, notes: '' }
+    }
   };
 } 
