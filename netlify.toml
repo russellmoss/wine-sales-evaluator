@@ -87,6 +87,7 @@
 [dev.environment]
   NODE_ENV = "development"
   NETLIFY_DEV = "true"
+  NETLIFY = "true"
   DEBUG = "*"
   # For local development, use memory storage instead of KV store
   JOB_STORAGE_TYPE = "memory"
