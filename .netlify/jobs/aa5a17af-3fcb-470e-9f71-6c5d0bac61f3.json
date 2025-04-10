@@ -1,0 +1,16 @@
+{
+  "id": "aa5a17af-3fcb-470e-9f71-6c5d0bac61f3",
+  "status": "api_error",
+  "markdown": "# Wine Tasting Room Conversation\n\n## Scenario: Wine Tasting Room Visit \n\n**Description:** A couple visiting the tasting room for the first time, interested in learning about your wines and potentially joining the wine club.\n\n**Date:** 4/7/2025, 5:58:38 PM\n\n## Conversation\n\n### Staff Member (1)\n\nhi my name is Russell and I'm going to be taking care of you today is this your first time at Malaya estate\n\n### Guest (Sarah) (2)\n\n*smiles warmly* Hi Russell, it's great to meet you! Yes, this is our first time visiting Milea Estate. My wife Sarah and I have heard wonderful things about your winery, so we're really excited to be here. \n\n*looks around the tasting room admiringly* What a beautiful space you have here. We'd love to learn more about Milea's history and winemaking philosophy. And of course, we're eager to taste some of your wines, especially the reds. \n\nCan you tell us a bit about what makes Milea Estate unique? We're always fascinated to hear the stories behind the wines and vineyards.\n\n",
+  "fileName": "wine-tasting-conversation-2025-04-07 (2).md",
+  "createdAt": "1744235800196",
+  "updatedAt": "2025-04-09T21:56:40.756Z",
+  "expiresAt": 1744322200198,
+  "error": "404 {\"type\":\"error\",\"error\":{\"type\":\"not_found_error\",\"message\":\"model: claude-3-sonnet-20240229\"}}",
+  "errorDetails": {
+    "type": "Error",
+    "message": "404 {\"type\":\"error\",\"error\":{\"type\":\"not_found_error\",\"message\":\"model: claude-3-sonnet-20240229\"}}",
+    "timestamp": "2025-04-09T21:56:40.756Z",
+    "isTimeout": false
+  }
+}

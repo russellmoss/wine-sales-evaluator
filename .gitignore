@@ -80,3 +80,4 @@ pids
 /dashboard/ 
 # Local Netlify folder
 .netlify
+!.netlify/jobs/
