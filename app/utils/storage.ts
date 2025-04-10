@@ -444,13 +444,47 @@ export function getStorageProvider(): StorageProvider {
     console.log(`Storage Provider: Using local development storage at ${storageDir}`);
   }
 
-  // Create the directory if it doesn't exist
-  if (!fs.existsSync(storageDir)) {
-    console.log(`Storage Provider: Creating storage directory: ${storageDir}`);
-    fs.mkdirSync(storageDir, { recursive: true });
+  // Try different fallback directories if needed
+  const fallbackDirs = [
+    storageDir,
+    '/tmp/jobs',
+    path.join(process.cwd(), 'jobs'),
+    path.join(process.cwd(), '.jobs')
+  ];
+  
+  let selectedDir = null;
+  
+  // Find the first directory we can write to
+  for (const dir of fallbackDirs) {
+    try {
+      console.log(`Storage Provider: Trying directory ${dir}`);
+      
+      // Try to create the directory if it doesn't exist
+      if (!fs.existsSync(dir)) {
+        console.log(`Storage Provider: Creating directory ${dir}`);
+        fs.mkdirSync(dir, { recursive: true, mode: 0o755 });
+      }
+      
+      // Check if we can write to the directory
+      const testFile = path.join(dir, '.write-test');
+      fs.writeFileSync(testFile, 'test', { mode: 0o644 });
+      fs.unlinkSync(testFile);
+      
+      console.log(`Storage Provider: Successfully using directory ${dir}`);
+      selectedDir = dir;
+      break;
+    } catch (error) {
+      console.error(`Storage Provider: Cannot use directory ${dir}:`, error);
+    }
   }
   
-  return new FileStorageProvider(storageDir, maxAge);
+  if (!selectedDir) {
+    console.error(`Storage Provider: Failed to find a writable directory, using memory storage`);
+    return MemoryStorageProvider.getInstance();
+  }
+  
+  console.log(`Storage Provider: Using directory ${selectedDir}`);
+  return new FileStorageProvider(selectedDir, maxAge);
 }
 
 // Helper function to create a new job

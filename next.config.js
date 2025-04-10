@@ -51,6 +51,11 @@ const nextConfig = {
     NODE_ENV: process.env.NODE_ENV || 'development',
     IS_RENDER: process.env.RENDER === 'true',
   },
+  
+  // Ensure proper experimental features for standalone output
+  experimental: {
+    // Any experimental features needed for standalone mode
+  },
 };
 
 module.exports = nextConfig; 

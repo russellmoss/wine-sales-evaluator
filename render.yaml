@@ -2,8 +2,8 @@ services:
   - type: web
     name: wine-sales-evaluator
     env: node
-    buildCommand: npm ci --include=dev && npm run build
-    startCommand: node server.js
+    buildCommand: npm ci --include=dev && npm run build && chmod +x render-setup.sh
+    startCommand: ./render-setup.sh && node server.js
     healthCheckPath: /api/health
     # Define a persistent disk for job storage
     disk:
@@ -14,7 +14,7 @@ services:
       - key: NODE_ENV
         value: production
       - key: RENDER
-        value: true
+        value: "true"
       - key: CLAUDE_API_KEY
         sync: false # This will be set via Render dashboard
       - key: RENDER_STORAGE_DIR
@@ -25,6 +25,8 @@ services:
         value: "86400000"
       - key: NEXT_PUBLIC_USE_DIRECT_EVALUATION
         value: "false"
+      - key: PORT
+        value: "10000"
     # Add build-time environment variables if needed
     buildEnv:
       - key: NEXT_TELEMETRY_DISABLED
