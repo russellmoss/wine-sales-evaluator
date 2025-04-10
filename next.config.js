@@ -25,6 +25,15 @@ const nextConfig = {
     
     return config;
   },
+  // Configure rewrites to proxy API requests to Netlify functions
+  async rewrites() {
+    return [
+      {
+        source: '/api/:path*',
+        destination: '/.netlify/functions/:path*',
+      },
+    ];
+  },
 };
 
 module.exports = nextConfig; 
