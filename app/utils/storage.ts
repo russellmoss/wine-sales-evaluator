@@ -545,34 +545,19 @@ export class FileStorageProvider implements StorageProvider {
 
 // Factory function to get the appropriate storage provider
 export function getStorageProvider(): StorageProvider {
-  const storageType = process.env.JOB_STORAGE_TYPE || 'memory';
+  const storageType = process.env.JOB_STORAGE_TYPE || 'file';
   const maxAge = parseInt(process.env.JOB_MAX_AGE || '86400000', 10);
-  const isNetlify = process.env.NETLIFY === 'true';
   const isDev = process.env.NODE_ENV === 'development';
 
-  console.log(`Initializing storage provider: type=${storageType}, isNetlify=${isNetlify}, isDev=${isDev}`);
+  console.log(`Initializing storage provider: type=${storageType}, isDev=${isDev}`);
 
-  try {
-    if (storageType === 'kv' && isNetlify) {
-      console.log('Using KV storage provider in Netlify environment');
-      return new KVStorageProvider(maxAge);
-    } else if (storageType === 'kv' && !isNetlify) {
-      console.log('KV storage requested but not in Netlify environment, falling back to file storage');
-    }
-  } catch (error) {
-    console.warn('Failed to initialize KV storage, falling back to file storage:', error);
-  }
+  // Use file storage for both production and development
+  const storageDir = process.env.NODE_ENV === 'production' 
+    ? '/var/lib/app/jobs' 
+    : path.join(process.cwd(), '.netlify', 'jobs');
 
-  // Use file storage for local development to persist jobs between function calls
-  if (isDev) {
-    console.log('Development environment detected, using file storage');
-    const jobsDir = path.join(process.cwd(), '.netlify', 'jobs');
-    return new FileStorageProvider(jobsDir, maxAge);
-  }
-
-  // Fallback to memory storage for other environments
-  console.log('Using memory storage provider');
-  return new MemoryStorageProvider();
+  console.log(`Using file storage provider with directory: ${storageDir}`);
+  return new FileStorageProvider(storageDir, maxAge);
 }
 
 // Helper function to create a new job
