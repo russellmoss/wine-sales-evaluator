@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { handler as analyzeConversationHandler } from '../../netlify/functions/analyze-conversation-background';
+import { handler as analyzeConversationHandler } from '../../netlify/functions/analyze-conversation';
 import { handler as checkJobStatusHandler } from '../../netlify/functions/check-job-status';
 import { handler as forceCompleteJobHandler } from '../../netlify/functions/force-complete-job';
 
