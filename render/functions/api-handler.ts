@@ -25,7 +25,7 @@ const convertRequest = (req: NextApiRequest) => {
     body: req.body,
     queryStringParameters,
     headers,
-    httpMethod: req.method || 'GET', // Ensure httpMethod is always a string
+    httpMethod: req.method || 'GET',
     path: req.url || '/',
     isBase64Encoded: false,
     multiValueHeaders: {},
@@ -83,9 +83,14 @@ const createContext = () => {
   };
 };
 
-// Helper function to convert Netlify function response to Next.js response
-const sendResponse = (res: NextApiResponse, statusCode: number, body: any) => {
-  res.status(statusCode).json(body);
+// Helper function to safely parse JSON
+const safeJsonParse = (str: string) => {
+  try {
+    return JSON.parse(str);
+  } catch (error) {
+    console.error('Error parsing JSON:', error);
+    return { error: 'Invalid JSON response' };
+  }
 };
 
 // API handler for all endpoints
@@ -94,23 +99,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   
   try {
     // Route to the appropriate handler based on the path
-    if (path.includes('/api/analyze-conversation')) {
+    if (path.startsWith('/api/analyze-conversation')) {
       const netlifyReq = convertRequest(req);
       const context = createContext();
       const result = await analyzeConversationHandler(netlifyReq, context);
-      sendResponse(res, result.statusCode, JSON.parse(result.body));
+      const body = safeJsonParse(result.body);
+      res.status(result.statusCode).json(body);
     } 
-    else if (path.includes('/api/check-job-status')) {
+    else if (path.startsWith('/api/check-job-status')) {
       const netlifyReq = convertRequest(req);
       const context = createContext();
       const result = await checkJobStatusHandler(netlifyReq, context);
-      sendResponse(res, result.statusCode, JSON.parse(result.body));
+      const body = safeJsonParse(result.body);
+      res.status(result.statusCode).json(body);
     }
-    else if (path.includes('/api/force-complete-job')) {
+    else if (path.startsWith('/api/force-complete-job')) {
       const netlifyReq = convertRequest(req);
       const context = createContext();
       const result = await forceCompleteJobHandler(netlifyReq, context);
-      sendResponse(res, result.statusCode, JSON.parse(result.body));
+      const body = safeJsonParse(result.body);
+      res.status(result.statusCode).json(body);
     }
     else {
       res.status(404).json({ error: 'Not found' });
