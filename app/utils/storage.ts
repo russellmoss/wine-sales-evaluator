@@ -417,15 +417,38 @@ export function getStorageProvider(): StorageProvider {
   const storageType = process.env.JOB_STORAGE_TYPE || 'file';
   const maxAge = parseInt(process.env.JOB_MAX_AGE || '86400000', 10);
   const isDev = process.env.NODE_ENV === 'development';
+  const isNetlify = process.env.NETLIFY === 'true';
+  const isRender = process.env.RENDER === 'true';
 
-  console.log(`Initializing storage provider: type=${storageType}, isDev=${isDev}`);
+  console.log(`Storage Provider: Initializing with type=${storageType}, isDev=${isDev}, isNetlify=${isNetlify}, isRender=${isRender}`);
+  console.log(`Storage Provider: Environment variables:`, {
+    NODE_ENV: process.env.NODE_ENV,
+    NETLIFY: process.env.NETLIFY,
+    RENDER: process.env.RENDER,
+    JOB_STORAGE_TYPE: process.env.JOB_STORAGE_TYPE,
+    JOB_MAX_AGE: process.env.JOB_MAX_AGE,
+    NETLIFY_SITE_ID: process.env.NETLIFY_SITE_ID ? 'Set (not shown for security)' : 'Not set',
+    NETLIFY_ACCESS_TOKEN: process.env.NETLIFY_ACCESS_TOKEN ? 'Set (not shown for security)' : 'Not set'
+  });
 
-  // Use file storage for both production and development
-  const storageDir = process.env.NODE_ENV === 'production' 
-    ? '/var/lib/app/jobs' 
-    : path.join(process.cwd(), '.netlify', 'jobs');
+  // Determine appropriate storage directory for Render
+  let storageDir;
+  if (process.env.NODE_ENV === 'production') {
+    // For Render, use a writable directory
+    storageDir = process.env.RENDER_STORAGE_DIR || '/tmp/jobs';
+  } else {
+    // For local development
+    storageDir = path.join(process.cwd(), '.render', 'jobs');
+  }
 
-  console.log(`Using file storage provider with directory: ${storageDir}`);
+  console.log(`Storage Provider: Using file storage provider with directory: ${storageDir}`);
+  
+  // Create the directory if it doesn't exist
+  if (!fs.existsSync(storageDir)) {
+    console.log(`Storage Provider: Creating storage directory: ${storageDir}`);
+    fs.mkdirSync(storageDir, { recursive: true });
+  }
+  
   return new FileStorageProvider(storageDir, maxAge);
 }
 

@@ -51,7 +51,8 @@ const MarkdownImporter: FC<MarkdownImporterProps> = ({ onAnalysisComplete, isAna
         toast('Using direct evaluation mode (no background processing)');
         
         // Call the direct evaluation endpoint
-        const response = await fetch('/.netlify/functions/analyze-conversation', {
+        console.log('MarkdownImporter: Calling API endpoint', { endpoint: '/api/analyze-conversation' });
+        const response = await fetch('/api/analyze-conversation', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -62,12 +63,19 @@ const MarkdownImporter: FC<MarkdownImporterProps> = ({ onAnalysisComplete, isAna
             directEvaluation: true
           }),
         });
-
+        
+        console.log('MarkdownImporter: API response received', { 
+          status: response.status, 
+          statusText: response.statusText,
+          ok: response.ok
+        });
+        
         if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || `Error: ${response.status}`);
+          const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+          console.error('MarkdownImporter: API error response', errorData);
+          throw new Error(errorData.error || `API error: ${response.status} ${response.statusText}`);
         }
-
+        
         const { result } = await response.json();
         
         if (!result) {
@@ -96,7 +104,7 @@ const MarkdownImporter: FC<MarkdownImporterProps> = ({ onAnalysisComplete, isAna
       }
 
       // Start the analysis job
-      const response = await fetch('/.netlify/functions/analyze-conversation', {
+      const response = await fetch('/api/analyze-conversation', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -136,7 +144,7 @@ const MarkdownImporter: FC<MarkdownImporterProps> = ({ onAnalysisComplete, isAna
         await new Promise(resolve => setTimeout(resolve, 3000));
         
         try {
-          const statusResponse = await fetch(`/.netlify/functions/check-job-status?jobId=${jobId}`, {
+          const statusResponse = await fetch(`/api/check-job-status?jobId=${jobId}`, {
             method: 'GET'
           });
           
@@ -174,7 +182,7 @@ const MarkdownImporter: FC<MarkdownImporterProps> = ({ onAnalysisComplete, isAna
         // Try direct evaluation as a fallback
         toast('Background job timed out. Trying direct evaluation...');
         
-        const directResponse = await fetch('/.netlify/functions/analyze-conversation', {
+        const directResponse = await fetch('/api/analyze-conversation', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

@@ -43,15 +43,17 @@ const MarkdownImporter: React.FC<MarkdownImporterProps> = ({
     setIsAnalyzing(true);
     
     try {
-      // Start the analysis job
-      const response = await fetch('/.netlify/functions/analyze-conversation', {
+      // Call the direct evaluation endpoint
+      console.log('MarkdownImporter: Calling API endpoint', { endpoint: '/api/analyze-conversation' });
+      const response = await fetch('/api/analyze-conversation', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ 
-          markdown,
-          fileName 
+        body: JSON.stringify({
+          markdown: markdown,
+          fileName: fileName,
+          directEvaluation: true
         }),
       });
       
@@ -72,29 +74,37 @@ const MarkdownImporter: React.FC<MarkdownImporterProps> = ({
       // Poll for job status
       let completed = false;
       let result = null;
+      let retryCount = 0;
+      const startTime = Date.now();
+      const MAX_POLLING_TIME = 300000; // 300 seconds max polling time
       
-      while (!completed) {
+      while (!completed && retryCount < 20 && (Date.now() - startTime) < MAX_POLLING_TIME) {
         // Wait 3 seconds between polls
         await new Promise(resolve => setTimeout(resolve, 3000));
         
-        const statusResponse = await fetch(`/.netlify/functions/check-job-status?jobId=${jobId}`, {
-          method: 'GET'
-        });
-        
-        if (!statusResponse.ok) {
-          throw new Error(`Error checking status: ${statusResponse.status}`);
+        try {
+          const statusResponse = await fetch(`/api/check-job-status?jobId=${jobId}`, {
+            method: 'GET'
+          });
+          
+          if (!statusResponse.ok) {
+            throw new Error(`Error checking status: ${statusResponse.status}`);
+          }
+          
+          const job = await statusResponse.json();
+          
+          if (job.status === 'completed') {
+            completed = true;
+            result = job.result;
+          } else if (job.status === 'failed') {
+            throw new Error(job.error || 'Analysis failed');
+          }
+          
+          // If still processing, continue polling
+        } catch (error) {
+          console.error('Error checking job status:', error);
+          retryCount++;
         }
-        
-        const job = await statusResponse.json();
-        
-        if (job.status === 'completed') {
-          completed = true;
-          result = job.result;
-        } else if (job.status === 'failed') {
-          throw new Error(job.error || 'Analysis failed');
-        }
-        
-        // If still processing, continue polling
       }
       
       // Validate the evaluation data structure

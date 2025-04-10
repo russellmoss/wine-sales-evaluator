@@ -2,6 +2,7 @@ import './globals.css';
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import { Toaster } from 'react-hot-toast';
+import GlobalErrorBoundary from './components/GlobalErrorBoundary';
 
 // Initialize the font with proper error handling
 const inter = Inter({ 
@@ -23,7 +24,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter?.className || ''}>
-        {children}
+        <GlobalErrorBoundary>
+          {children}
+        </GlobalErrorBoundary>
         <Toaster position="top-right" />
       </body>
     </html>

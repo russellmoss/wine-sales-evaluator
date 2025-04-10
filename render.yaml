@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: wine-sales-evaluator
+    env: node
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: CLAUDE_API_KEY
+        sync: false
+      - key: RENDER_STORAGE_DIR
+        value: /tmp/jobs
+      - key: JOB_STORAGE_TYPE
+        value: file
+      - key: JOB_MAX_AGE
+        value: 86400000
+      - key: NEXT_PUBLIC_USE_DIRECT_EVALUATION
+        value: false 

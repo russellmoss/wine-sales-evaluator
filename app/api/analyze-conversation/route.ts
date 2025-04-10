@@ -1,68 +1,303 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { Anthropic } from '@anthropic-ai/sdk';
+import { getStorageProvider, createJob } from '../../../app/utils/storage';
+import fs from 'fs';
+import path from 'path';
+
+// Add detailed logging
+console.log('API Route: analyze-conversation loaded');
+console.log('Environment variables:', {
+  NODE_ENV: process.env.NODE_ENV,
+  CLAUDE_API_KEY: process.env.CLAUDE_API_KEY ? 'Set (not shown for security)' : 'Not set',
+  JOB_STORAGE_TYPE: process.env.JOB_STORAGE_TYPE,
+  JOB_MAX_AGE: process.env.JOB_MAX_AGE,
+  NEXT_PUBLIC_USE_DIRECT_EVALUATION: process.env.NEXT_PUBLIC_USE_DIRECT_EVALUATION
+});
+
+const anthropic = new Anthropic({
+  apiKey: process.env.CLAUDE_API_KEY || '',
+});
+
+// Load the evaluation rubric
+const loadRubric = () => {
+  try {
+    const rubricPath = path.join(process.cwd(), 'public', 'data', 'wines_sales_rubric.md');
+    console.log('API Route: Loading rubric from', rubricPath);
+    const rubric = fs.readFileSync(rubricPath, 'utf8');
+    console.log('API Route: Rubric loaded successfully');
+    return rubric;
+  } catch (error) {
+    console.error('API Route: Error loading rubric:', error);
+    return null;
+  }
+};
 
 export async function POST(request: NextRequest) {
-  console.log('API route: Starting request processing');
-  
+  console.log('API Route: POST request received');
   try {
     // Parse the request body
-    console.log('API route: Parsing request body');
     const body = await request.json();
-    console.log('API route: Request body parsed successfully');
-    
-    // Determine if we're in development or production
-    const isDevelopment = process.env.NODE_ENV === 'development';
-    console.log(`API route: Environment: ${isDevelopment ? 'development' : 'production'}`);
-    
-    // In development, we'll call the Netlify function directly
-    // In production, we'll use the Netlify function URL
-    let functionUrl;
-    
-    if (isDevelopment) {
-      // For local development, use the Netlify dev server if available
-      const netlifyDevUrl = process.env.NETLIFY_DEV_URL || 'http://localhost:8888';
-      functionUrl = `${netlifyDevUrl}/.netlify/functions/analyze-conversation`;
-      console.log(`API route: Development mode - using Netlify dev URL: ${functionUrl}`);
-    } else {
-      // For production, use the deployed Netlify function URL
-      const netlifyUrl = process.env.NETLIFY_URL || '';
-      if (!netlifyUrl) {
-        throw new Error('NETLIFY_URL environment variable is not set in production');
-      }
-      functionUrl = `${netlifyUrl}/.netlify/functions/analyze-conversation`;
-      console.log(`API route: Production mode - using Netlify URL: ${functionUrl}`);
-    }
-    
-    // Forward the request to the Netlify function
-    console.log('API route: Sending request to Netlify function');
-    const response = await fetch(functionUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
+    console.log('API Route: Request body parsed', { 
+      hasMarkdown: !!body.markdown, 
+      markdownLength: body.markdown?.length,
+      fileName: body.fileName
     });
     
-    console.log(`API route: Received response from Netlify function with status: ${response.status}`);
+    const { markdown, fileName } = body;
     
-    // Get the response data
-    const data = await response.json();
+    if (!markdown) {
+      console.log('API Route: Error - Markdown content is missing');
+      return NextResponse.json({ 
+        error: 'Markdown content is required' 
+      }, { status: 400 });
+    }
+
+    // Initialize storage provider
+    console.log('API Route: Initializing storage provider');
+    const storageProvider = getStorageProvider();
     
-    // Return the response from the Netlify function
-    return NextResponse.json(data, { status: response.status });
+    // Create a new job
+    console.log('API Route: Creating new job');
+    const job = createJob(markdown, fileName);
+    console.log('API Route: Job created', { jobId: job.id });
+    
+    // Save the job
+    console.log('API Route: Saving job to storage');
+    await storageProvider.saveJob(job);
+    console.log('API Route: Job saved successfully');
+    
+    // Load the evaluation rubric
+    const rubric = loadRubric();
+    
+    // Process the conversation (simplified version of analyze-conversation-background)
+    try {
+      console.log('API Route: Calling Claude API');
+      // Call Claude API
+      const response = await anthropic.messages.create({
+        model: "claude-3-7-sonnet-20250219",
+        max_tokens: 8000,
+        system: "You are a wine sales trainer evaluating a conversation between a winery staff member and guests. Your evaluation should be thorough, fair, and actionable. Provide detailed rationale for each criterion score with specific examples from the conversation.",
+        messages: [
+          { 
+            role: "user", 
+            content: `I need you to evaluate the wine tasting conversation below against the criteria in the evaluation rubric. Format your evaluation in JSON structure. Please follow these instructions:
+
+1. Carefully analyze the conversation for evidence of each of the 10 weighted criteria in the rubric
+2. Score each criterion on a scale of 1-5 based on the detailed descriptions in the rubric
+3. Calculate the weighted score for each criterion (criterion score × weight)
+4. Calculate the overall percentage score (sum of weighted scores ÷ 500 × 100)
+5. Determine the performance level based on the score ranges in the rubric
+6. Include 3 specific strengths demonstrated in the conversation
+7. Include 3 specific areas for improvement
+8. Provide 3 actionable recommendations
+9. Write detailed notes for each criterion explaining the score with specific examples from the conversation
+
+Output your evaluation in JSON format with the following fields:
+* staffName (extracted from the conversation)
+* date (from the conversation, format as YYYY-MM-DD)
+* overallScore (as a number from 0-100)
+* performanceLevel (based on score: Exceptional (90-100), Strong (80-89), Proficient (70-79), Developing (60-69), Needs Improvement (<60))
+* criteriaScores (array of 10 objects with criterion, weight, score(1-5), weightedScore, and notes)
+* strengths (array of 3 strengths)
+* areasForImprovement (array of 3 areas)
+* keyRecommendations (array of 3 recommendations)
+
+For each criterion, provide detailed notes that include:
+1. Specific examples from the conversation that demonstrate performance
+2. What was done well and why it was effective
+3. What could be improved with concrete suggestions
+4. A fair score based on the evidence
+
+The weighted score for each criterion should be calculated as: score × weight.
+The overall score should be calculated as the sum of all weighted scores divided by the sum of all weights, to get a percentage.
+
+Here's the evaluation rubric:
+
+${rubric || `# Winery Sales Simulation Evaluation Rubric
+
+## Evaluation Criteria
+
+### 1. Initial Greeting and Welcome (Weight: 8%)
+*How effectively does the staff member welcome guests and set a positive tone?*
+
+| Score | Description |
+|-------|-------------|
+| 1 | No greeting or unwelcoming approach |
+| 2 | Basic greeting but minimal warmth |
+| 3 | Friendly greeting but lacks personalization |
+| 4 | Warm, friendly greeting with good eye contact |
+| 5 | Exceptional welcome that makes guests feel valued and excited |
+
+### 2. Building Rapport (Weight: 10%)
+*How well does the staff member connect personally with the guests?*
+
+| Score | Description |
+|-------|-------------|
+| 1 | No attempt to connect personally with guests |
+| 2 | Minimal small talk, mostly transactional |
+| 3 | Some rapport-building questions but limited follow-up |
+| 4 | Good personal connection through meaningful conversation |
+| 5 | Excellent rapport building, including origin questions, future plans, and genuine interest |
+
+### 3. Winery History and Ethos (Weight: 10%)
+*How effectively does the staff member communicate Milea Estate's story and values?*
+
+| Score | Description |
+|-------|-------------|
+| 1 | No mention of winery history or values |
+| 2 | Brief, factual mention of winery background |
+| 3 | Adequate explanation of winery history and values |
+| 4 | Compelling storytelling about winery history, connecting to wines |
+| 5 | Passionate, engaging narrative that brings the winery ethos to life |
+
+### 4. Storytelling and Analogies (Weight: 10%)
+*How well does the staff member use storytelling and analogies to describe wines?*
+
+| Score | Description |
+|-------|-------------|
+| 1 | Technical descriptions only, no storytelling or analogies |
+| 2 | Minimal storytelling, mostly factual information |
+| 3 | Some storytelling elements but lacking rich analogies |
+| 4 | Good use of stories and analogies that help guests understand wines |
+| 5 | Exceptional storytelling that creates memorable experiences and makes wine accessible |
+
+### 5. Recognition of Buying Signals (Weight: 12%)
+*How well does the staff member notice and respond to buying signals?*
+
+| Score | Description |
+|-------|-------------|
+| 1 | Misses obvious buying signals completely |
+| 2 | Notices some signals but response is delayed or inappropriate |
+| 3 | Recognizes main buying signals with adequate response |
+| 4 | Quickly identifies buying signals and responds effectively |
+| 5 | Expertly recognizes subtle cues and capitalizes on buying moments |
+
+### 6. Customer Data Capture (Weight: 8%)
+*How effectively does the staff member attempt to collect customer information?*
+
+| Score | Description |
+|-------|-------------|
+| 1 | No attempt to capture customer data |
+| 2 | Single basic attempt at data collection |
+| 3 | Multiple attempts but without explaining benefits |
+| 4 | Good data capture attempts with clear value proposition |
+| 5 | Natural, non-intrusive data collection that feels beneficial to guest |
+
+### 7. Asking for the Sale (Weight: 12%)
+*How effectively does the staff member ask for wine purchases?*
+
+| Score | Description |
+|-------|-------------|
+| 1 | Never asks for sale or suggests purchase |
+| 2 | Vague suggestion about purchasing without direct ask |
+| 3 | Basic closing attempt but lacks confidence |
+| 4 | Clear, confident ask for purchase at appropriate time |
+| 5 | Multiple strategic closing attempts that feel natural and appropriate |
+
+### 8. Personalized Wine Recommendations (Weight: 10%)
+*How well does the staff member customize wine recommendations based on guest preferences?*
+
+| Score | Description |
+|-------|-------------|
+| 1 | Generic recommendations unrelated to expressed interests |
+| 2 | Basic recommendations with minimal personalization |
+| 3 | Adequate recommendations based on general preferences |
+| 4 | Well-tailored recommendations based on specific guest feedback |
+| 5 | Expertly customized selections that perfectly match expressed interests |
+
+### 9. Wine Club Presentation (Weight: 12%)
+*How effectively does the staff member present and invite guests to join the wine club?*
+
+| Score | Description |
+|-------|-------------|
+| 1 | No mention of wine club or inadequate response when asked |
+| 2 | Basic wine club information without personalization |
+| 3 | Adequate explanation of benefits but minimal customization |
+| 4 | Good presentation of wine club with benefits tailored to guest interests |
+| 5 | Compelling, personalized wine club presentation with clear invitation to join |
+
+### 10. Closing Interaction (Weight: 8%)
+*How well does the staff member conclude the interaction and encourage future visits?*
+
+| Score | Description |
+|-------|-------------|
+| 1 | Abrupt ending with no thanks or future invitation |
+| 2 | Basic thank you but no encouragement to return |
+| 3 | Polite conclusion with general invitation to return |
+| 4 | Warm thank you with specific suggestion for future visit |
+| 5 | Memorable farewell that reinforces relationship and ensures future visits |`}
+
+Here's the conversation to evaluate:
+${markdown.substring(0, 30000)}${markdown.length > 30000 ? '...(truncated)' : ''}
+
+Return ONLY the valid JSON with no additional explanation or text.`
+          }
+        ],
+        temperature: 0.1
+      });
+      
+      console.log('API Route: Claude API response received');
+      
+      // Extract result from Claude response
+      const result = response.content[0].text;
+      console.log('API Route: Claude response text length:', result.length);
+      
+      let evaluationData;
+      
+      try {
+        console.log('API Route: Attempting to parse Claude response as JSON');
+        evaluationData = JSON.parse(result);
+        console.log('API Route: Successfully parsed Claude response as JSON');
+      } catch (parseError) {
+        console.log('API Route: Failed to parse Claude response as JSON, attempting to extract JSON from text');
+        // Try to extract JSON from text if direct parsing fails
+        const jsonMatch = result.match(/(\{[\s\S]*\})/);
+        if (jsonMatch) {
+          console.log('API Route: Found JSON match in text, attempting to parse');
+          evaluationData = JSON.parse(jsonMatch[0]);
+          console.log('API Route: Successfully parsed extracted JSON');
+        } else {
+          console.error('API Route: Failed to extract JSON from Claude response');
+          throw new Error('Failed to parse evaluation result');
+        }
+      }
+      
+      // Update job with the result
+      console.log('API Route: Updating job with result');
+      job.status = 'completed';
+      job.result = evaluationData;
+      job.updatedAt = new Date().toISOString();
+      await storageProvider.saveJob(job);
+      console.log('API Route: Job updated with result');
+      
+      // Return the job ID to the client
+      console.log('API Route: Returning success response');
+      return NextResponse.json({ 
+        jobId: job.id,
+        message: 'Analysis job completed successfully',
+        result: evaluationData  // Include result directly for simplicity
+      });
+      
+    } catch (error) {
+      console.error('API Route: Error processing conversation:', error);
+      
+      // Update job status to failed
+      job.status = 'failed';
+      job.error = error instanceof Error ? error.message : 'Unknown error';
+      job.updatedAt = new Date().toISOString();
+      await storageProvider.saveJob(job);
+      
+      return NextResponse.json({ 
+        error: 'Failed to process conversation',
+        message: error instanceof Error ? error.message : 'Unknown error'
+      }, { status: 500 });
+    }
     
   } catch (error) {
-    console.error('API route error:', error);
-    // Log more details about the error
-    if (error instanceof Error) {
-      console.error('API route error details:', {
-        name: error.name,
-        message: error.message,
-        stack: error.stack
-      });
-    }
+    console.error('API Route: Error in analyze-conversation route:', error);
     return NextResponse.json({ 
       error: 'Internal server error',
-      message: error instanceof Error ? error.message : 'Unknown error occurred' 
+      message: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 });
   }
 } 
