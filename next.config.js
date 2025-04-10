@@ -7,7 +7,8 @@ const nextConfig = {
   },
   // Ensure all dependencies are properly handled
   transpilePackages: ['@react-pdf/renderer', 'recharts'],
-  // Disable webpack optimization for static export
+  
+  // Configure webpack for CSS and PDF handling
   webpack: (config, { isServer }) => {
     // Add specific configuration for @react-pdf/renderer
     if (!isServer) {
@@ -25,23 +26,24 @@ const nextConfig = {
     
     return config;
   },
-  // Configure environment variables
+  
+  // Environment variables configuration
   env: {
-    // Add any public environment variables that should be available to the client
     NEXT_PUBLIC_USE_DIRECT_EVALUATION: process.env.NEXT_PUBLIC_USE_DIRECT_EVALUATION || 'false',
   },
-  // Configure server-side environment variables
+  
+  // Server runtime configuration
   serverRuntimeConfig: {
-    // Will only be available on the server side
     CLAUDE_API_KEY: process.env.CLAUDE_API_KEY,
     JOB_STORAGE_TYPE: process.env.JOB_STORAGE_TYPE || 'file',
     JOB_MAX_AGE: process.env.JOB_MAX_AGE || '86400000',
-    RENDER_STORAGE_DIR: process.env.RENDER_STORAGE_DIR || '/tmp/jobs',
+    RENDER_STORAGE_DIR: process.env.RENDER_STORAGE_DIR || '/var/data/jobs',
   },
-  // Configure client-side environment variables
+  
+  // Public runtime configuration
   publicRuntimeConfig: {
-    // Will be available on both server and client
     NODE_ENV: process.env.NODE_ENV || 'development',
+    IS_RENDER: process.env.RENDER === 'true',
   },
 };
 

@@ -3,6 +3,7 @@ import { Anthropic } from '@anthropic-ai/sdk';
 import { getStorageProvider, createJob } from '../../../app/utils/storage';
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 
 // Add detailed logging
 console.log('API Route: analyze-conversation loaded');
@@ -34,44 +35,49 @@ const loadRubric = () => {
 
 export async function POST(request: NextRequest) {
   console.log('API Route: POST request received');
+  const requestId = crypto.randomUUID();
+  console.log(`API Route: Request ID: ${requestId}`);
+  
   try {
     // Parse the request body
     const body = await request.json();
     console.log('API Route: Request body parsed', { 
       hasMarkdown: !!body.markdown, 
       markdownLength: body.markdown?.length,
-      fileName: body.fileName
+      fileName: body.fileName,
+      requestId
     });
     
     const { markdown, fileName } = body;
     
     if (!markdown) {
-      console.log('API Route: Error - Markdown content is missing');
+      console.log(`API Route: Error - Markdown content is missing (Request ID: ${requestId})`);
       return NextResponse.json({ 
-        error: 'Markdown content is required' 
+        error: 'Markdown content is required',
+        requestId
       }, { status: 400 });
     }
 
     // Initialize storage provider
-    console.log('API Route: Initializing storage provider');
+    console.log(`API Route: Initializing storage provider (Request ID: ${requestId})`);
     const storageProvider = getStorageProvider();
     
     // Create a new job
-    console.log('API Route: Creating new job');
+    console.log(`API Route: Creating new job (Request ID: ${requestId})`);
     const job = createJob(markdown, fileName);
-    console.log('API Route: Job created', { jobId: job.id });
+    console.log(`API Route: Job created (Request ID: ${requestId}, Job ID: ${job.id})`);
     
     // Save the job
-    console.log('API Route: Saving job to storage');
+    console.log(`API Route: Saving job to storage (Request ID: ${requestId}, Job ID: ${job.id})`);
     await storageProvider.saveJob(job);
-    console.log('API Route: Job saved successfully');
+    console.log(`API Route: Job saved successfully (Request ID: ${requestId}, Job ID: ${job.id})`);
     
     // Load the evaluation rubric
     const rubric = loadRubric();
     
     // Process the conversation (simplified version of analyze-conversation-background)
     try {
-      console.log('API Route: Calling Claude API');
+      console.log(`API Route: Calling Claude API (Request ID: ${requestId}, Job ID: ${job.id})`);
       // Call Claude API
       const response = await anthropic.messages.create({
         model: "claude-3-7-sonnet-20250219",
@@ -236,50 +242,61 @@ Return ONLY the valid JSON with no additional explanation or text.`
         temperature: 0.1
       });
       
-      console.log('API Route: Claude API response received');
+      console.log(`API Route: Claude API response received (Request ID: ${requestId}, Job ID: ${job.id})`);
       
       // Extract result from Claude response
       const result = response.content[0].text;
-      console.log('API Route: Claude response text length:', result.length);
+      console.log(`API Route: Claude response text length: ${result.length} (Request ID: ${requestId}, Job ID: ${job.id})`);
       
       let evaluationData;
       
       try {
-        console.log('API Route: Attempting to parse Claude response as JSON');
+        console.log(`API Route: Attempting to parse Claude response as JSON (Request ID: ${requestId}, Job ID: ${job.id})`);
         evaluationData = JSON.parse(result);
-        console.log('API Route: Successfully parsed Claude response as JSON');
+        console.log(`API Route: Successfully parsed Claude response as JSON (Request ID: ${requestId}, Job ID: ${job.id})`);
       } catch (parseError) {
-        console.log('API Route: Failed to parse Claude response as JSON, attempting to extract JSON from text');
+        console.log(`API Route: Failed to parse Claude response as JSON, attempting to extract JSON from text (Request ID: ${requestId}, Job ID: ${job.id})`);
         // Try to extract JSON from text if direct parsing fails
         const jsonMatch = result.match(/(\{[\s\S]*\})/);
         if (jsonMatch) {
-          console.log('API Route: Found JSON match in text, attempting to parse');
+          console.log(`API Route: Found JSON match in text, attempting to parse (Request ID: ${requestId}, Job ID: ${job.id})`);
           evaluationData = JSON.parse(jsonMatch[0]);
-          console.log('API Route: Successfully parsed extracted JSON');
+          console.log(`API Route: Successfully parsed extracted JSON (Request ID: ${requestId}, Job ID: ${job.id})`);
         } else {
-          console.error('API Route: Failed to extract JSON from Claude response');
+          console.error(`API Route: Failed to extract JSON from Claude response (Request ID: ${requestId}, Job ID: ${job.id})`);
           throw new Error('Failed to parse evaluation result');
         }
       }
       
       // Update job with the result
-      console.log('API Route: Updating job with result');
+      console.log(`API Route: Updating job with result (Request ID: ${requestId}, Job ID: ${job.id})`);
       job.status = 'completed';
       job.result = evaluationData;
       job.updatedAt = new Date().toISOString();
       await storageProvider.saveJob(job);
-      console.log('API Route: Job updated with result');
+      console.log(`API Route: Job updated with result (Request ID: ${requestId}, Job ID: ${job.id})`);
       
       // Return the job ID to the client
-      console.log('API Route: Returning success response');
+      console.log(`API Route: Returning success response (Request ID: ${requestId}, Job ID: ${job.id})`);
       return NextResponse.json({ 
         jobId: job.id,
         message: 'Analysis job completed successfully',
-        result: evaluationData  // Include result directly for simplicity
+        result: evaluationData,  // Include result directly for simplicity
+        requestId
       });
       
     } catch (error) {
-      console.error('API Route: Error processing conversation:', error);
+      console.error(`API Route: Error processing conversation (Request ID: ${requestId}, Job ID: ${job.id}):`, error);
+      
+      // Detailed error logging
+      console.error({
+        errorType: error instanceof Error ? error.constructor.name : 'Unknown',
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        timestamp: new Date().toISOString(),
+        requestId,
+        jobId: job.id
+      });
       
       // Update job status to failed
       job.status = 'failed';
@@ -287,17 +304,45 @@ Return ONLY the valid JSON with no additional explanation or text.`
       job.updatedAt = new Date().toISOString();
       await storageProvider.saveJob(job);
       
+      // Determine error message based on the type of error
+      let errorMessage = 'Failed to process conversation';
+      let statusCode = 500;
+      
+      if (error instanceof Error) {
+        if (error.message.includes('Claude API') || error.message.includes('anthropic')) {
+          errorMessage = 'Error communicating with Claude API. Please try again later.';
+        } else if (error.message.includes('storage') || error.message.includes('file')) {
+          errorMessage = 'Error saving analysis results. Please try again later.';
+        } else if (error.message.includes('timeout') || error.message.includes('timed out')) {
+          errorMessage = 'Analysis operation timed out. Please try again with a shorter conversation.';
+          statusCode = 408; // Request Timeout
+        }
+      }
+      
       return NextResponse.json({ 
-        error: 'Failed to process conversation',
-        message: error instanceof Error ? error.message : 'Unknown error'
-      }, { status: 500 });
+        error: errorMessage,
+        message: error instanceof Error ? error.message : 'Unknown error',
+        requestId,
+        jobId: job.id
+      }, { status: statusCode });
     }
     
   } catch (error) {
-    console.error('API Route: Error in analyze-conversation route:', error);
+    console.error(`API Route: Error in analyze-conversation route (Request ID: ${requestId}):`, error);
+    
+    // Detailed error logging
+    console.error({
+      errorType: error instanceof Error ? error.constructor.name : 'Unknown',
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      timestamp: new Date().toISOString(),
+      requestId
+    });
+    
     return NextResponse.json({ 
       error: 'Internal server error',
-      message: error instanceof Error ? error.message : 'Unknown error'
+      message: error instanceof Error ? error.message : 'Unknown error',
+      requestId
     }, { status: 500 });
   }
 } 
