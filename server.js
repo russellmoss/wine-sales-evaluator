@@ -3,8 +3,8 @@ const path = require('path');
 // Get the server from the standalone build
 const server = require('./.next/standalone/server.js');
 
-// Get port from environment variable or default to 3000
-const port = process.env.PORT || 3000;
+// Get port from environment variable or default to 10000 (Render default)
+const port = process.env.PORT || 10000;
 
 // Log startup information
 console.log(`Starting server on port ${port}`);
