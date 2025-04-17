@@ -239,7 +239,7 @@ const PDFDocument: React.FC<{ evaluationData: EvaluationData }> = ({ evaluationD
                 <Text style={styles.criterionNotes}>{criterion.notes}</Text>
                 {example && (
                   <View style={styles.exampleBox}>
-                    <Text style={styles.exampleText}>"{example}"</Text>
+                    <Text style={styles.exampleText}>&quot;{example}&quot;</Text>
                   </View>
                 )}
                 {suggestions.length > 0 && (

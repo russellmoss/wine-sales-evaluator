@@ -19,7 +19,7 @@ import {
 import dynamic from 'next/dynamic';
 
 // Dynamically import PDFExport with no SSR
-const PDFExportComponent = dynamic(() => import('../../components/PDFExport'), {
+const _PDFExportComponent = dynamic(() => import('../../components/PDFExport'), {
   ssr: false,
   loading: () => (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -38,9 +38,9 @@ export default function DetailedResultsPage() {
   const [evaluationData, setEvaluationData] = useState<EvaluationData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [expandedCriterion, setExpandedCriterion] = useState<string | null>(null);
-  const [hoveredCriterion, setHoveredCriterion] = useState<string | null>(null);
-  const [chartLoaded, setChartLoaded] = useState(false);
+  const [_expandedCriterion, _setExpandedCriterion] = useState<string | null>(null);
+  const [_hoveredCriterion, _setHoveredCriterion] = useState<string | null>(null);
+  const [_chartLoaded, setChartLoaded] = useState(false);
   const [showPDFExport, setShowPDFExport] = useState(false);
 
   useEffect(() => {
@@ -119,14 +119,14 @@ export default function DetailedResultsPage() {
   };
 
   // Helper function to get hover color based on score
-  const getHoverColor = (score: number) => {
+  const _getHoverColor = (score: number) => {
     if (score >= 4) return 'bg-green-600';
     if (score >= 3) return 'bg-yellow-600';
     return 'bg-red-600';
   };
 
   // Helper function to get text color based on score
-  const getTextColor = (score: number) => {
+  const _getTextColor = (score: number) => {
     if (score >= 4) return 'text-green-700';
     if (score >= 3) return 'text-yellow-700';
     return 'text-red-700';
