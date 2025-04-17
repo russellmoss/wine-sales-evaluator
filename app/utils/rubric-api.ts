@@ -11,6 +11,12 @@ function getBaseUrl() {
   }
   
   // Server-side
+  if (process.env.RENDER === 'true') {
+    // For Render deployment
+    return `http://localhost:${process.env.PORT || 10000}${basePath}`;
+  }
+  
+  // For other environments
   const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
   const host = process.env.VERCEL_URL || process.env.RENDER_EXTERNAL_URL || 'localhost:3000';
   return `${protocol}://${host}${basePath}`;
