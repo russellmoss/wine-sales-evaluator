@@ -2,14 +2,18 @@ import { Rubric } from '../types/rubric';
 
 // Helper function to get the base URL
 function getBaseUrl() {
+  // Get the configured base path from Next.js config
+  const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+  
   if (typeof window !== 'undefined') {
-    // Client-side
-    return '';
+    // Client-side: Use the current origin + base path
+    return `${window.location.origin}${basePath}`;
   }
+  
   // Server-side
   const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
   const host = process.env.VERCEL_URL || process.env.RENDER_EXTERNAL_URL || 'localhost:3000';
-  return `${protocol}://${host}`;
+  return `${protocol}://${host}${basePath}`;
 }
 
 // API client for rubric management
