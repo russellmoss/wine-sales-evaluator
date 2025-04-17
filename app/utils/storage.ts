@@ -1,13 +1,15 @@
 import fs from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
-import { Rubric } from '../types/rubric';
+import { Rubric, createDefaultWineSalesRubric } from '../types/rubric';
+import { EvaluationData } from '../types/evaluation';
+import { JobResult } from '../types/job';
 
 // Define the job status interface
 export interface JobStatus {
   id: string;
   status: 'pending' | 'processing' | 'completed' | 'failed' | 'unknown' | 'api_error';
-  result?: any;
+  result?: JobResult;
   error?: string;
   errorDetails?: {
     type: string;
@@ -884,9 +886,6 @@ export async function initializeRubricSystem(): Promise<void> {
     
     if (rubrics.length === 0) {
       console.log('Storage Provider: No rubrics found, creating default wine sales rubric');
-      
-      // Import the createDefaultWineSalesRubric function
-      const { createDefaultWineSalesRubric } = require('../types/rubric');
       
       // Create and save default rubric
       const defaultRubric = createDefaultWineSalesRubric();

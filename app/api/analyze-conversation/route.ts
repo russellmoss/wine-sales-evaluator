@@ -4,7 +4,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { getStorageProvider } from '../../utils/storage';
 import { validateEvaluationData } from '../../utils/validation';
 import { RubricApi } from '../../utils/rubric-api';
-import { JobStatus } from '../../types/job';
+import { JobStatus, JobResult } from '../../types/job';
+import { EvaluationData } from '../../types/evaluation';
 
 // Add detailed logging
 console.log('API Route: analyze-conversation loaded');
@@ -183,63 +184,81 @@ Return ONLY the valid JSON with the following structure:
         
         console.log(`API Route: Claude API response received (Request ID: ${requestId}, Job ID: ${job.id})`);
         
-        // Extract result from Claude response
-        const content = response.content[0];
-        const result = typeof content === 'object' && 'text' in content ? content.text : String(content);
-        console.log(`API Route: Claude response text length: ${result.length} (Request ID: ${requestId}, Job ID: ${job.id})`);
-        
-        let evaluationData;
-        
+        // Parse the response
+        let evaluationData: EvaluationData;
         try {
-          console.log(`API Route: Attempting to parse Claude response as JSON (Request ID: ${requestId}, Job ID: ${job.id})`);
-          evaluationData = JSON.parse(result);
-          console.log(`API Route: Successfully parsed Claude response as JSON (Request ID: ${requestId}, Job ID: ${job.id})`);
-        } catch (parseError) {
-          console.log(`API Route: Failed to parse Claude response as JSON, attempting to extract JSON from text (Request ID: ${requestId}, Job ID: ${job.id})`);
-          // Try to extract JSON from text if direct parsing fails
-          const jsonMatch = result.match(/(\{[\s\S]*\})/);
-          if (jsonMatch) {
-            console.log(`API Route: Found JSON match in text, attempting to parse (Request ID: ${requestId}, Job ID: ${job.id})`);
-            evaluationData = JSON.parse(jsonMatch[0]);
-            console.log(`API Route: Successfully parsed extracted JSON (Request ID: ${requestId}, Job ID: ${job.id})`);
-          } else {
-            console.error(`API Route: Failed to extract JSON from Claude response (Request ID: ${requestId}, Job ID: ${job.id})`);
-            throw new Error('Failed to parse evaluation result');
+          // Get the text content from the response
+          const content = response.content[0];
+          const responseText = typeof content === 'object' && 'text' in content ? content.text : String(content);
+          
+          console.log('API Route: Raw response:', responseText.substring(0, 500) + '...');
+          
+          // Try to parse the response as JSON
+          try {
+            evaluationData = JSON.parse(responseText);
+          } catch (parseError) {
+            // If direct parsing fails, try to extract JSON from the response
+            console.log('API Route: Direct JSON parse failed, trying to extract JSON');
+            const jsonMatch = responseText.match(/(\{[\s\S]*\})/);
+            if (!jsonMatch) {
+              throw new Error('No valid JSON found in response');
+            }
+            evaluationData = JSON.parse(jsonMatch[1]);
           }
+          
+          console.log('API Route: Successfully parsed response into JSON');
+        } catch (error) {
+          console.error('API Route: Error parsing response:', error);
+          throw new Error(`Failed to parse API response: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
         
         // Validate the evaluation data
         const validationResult = validateEvaluationData(evaluationData);
         if (!validationResult.isValid) {
           console.warn('API Route: Validation issues found:', validationResult.errors);
+          throw new Error(`Invalid evaluation data: ${validationResult.errors.join(', ')}`);
         }
         
+        // Create the job result
+        const jobResult: JobResult = {
+          evaluation: validationResult.data,
+          metadata: {
+            processingTime: Date.now() - new Date(job.createdAt).getTime(),
+            modelVersion: 'claude-3-7-sonnet-20250219'
+          }
+        };
+        
         // Update job with the result
-        console.log(`API Route: Updating job with result (Request ID: ${requestId}, Job ID: ${job.id})`);
         job.status = 'completed';
-        job.result = validationResult.data;
+        job.result = jobResult;
         job.updatedAt = new Date().toISOString();
         await storage.saveJob(job);
         
-        // Return the result
-        return NextResponse.json({ result: validationResult.data });
+        console.log(`API Route: Job ${job.id} completed successfully`);
+        
+        // Return both the evaluation data and the full job result
+        return NextResponse.json({ 
+          result: validationResult.data,
+          jobResult: jobResult
+        });
         
       } catch (error) {
-        console.error(`API Route: Error processing conversation (Request ID: ${requestId}, Job ID: ${job.id}):`, error);
+        console.error('API Route: Error processing request:', error);
         
-        // Update job status to failed
+        // Update job with error details
         job.status = 'failed';
         job.error = error instanceof Error ? error.message : 'Unknown error';
         job.errorDetails = {
-          type: error instanceof Error ? error.name : 'UnknownError',
+          type: error instanceof Error ? error.constructor.name : 'UnknownError',
           message: error instanceof Error ? error.message : 'Unknown error',
           timestamp: new Date().toISOString()
         };
         job.updatedAt = new Date().toISOString();
+        
         await storage.saveJob(job);
         
         return NextResponse.json(
-          { error: 'Failed to process conversation', details: error instanceof Error ? error.message : 'Unknown error' },
+          { error: job.error, errorDetails: job.errorDetails },
           { status: 500 }
         );
       }

@@ -1,13 +1,14 @@
 import { NextApiRequest, NextApiResponse } from 'next';
+import { Handler, HandlerContext, HandlerEvent } from '@netlify/functions';
 import { handler as analyzeConversationHandler } from '../../netlify/functions/analyze-conversation';
 import { handler as checkJobStatusHandler } from '../../netlify/functions/check-job-status';
 import { handler as forceCompleteJobHandler } from '../../netlify/functions/force-complete-job';
 
 // Helper function to convert Next.js request to a format similar to Netlify functions
-const convertRequest = (req: NextApiRequest) => {
+const convertRequest = (_req: NextApiRequest): HandlerEvent => {
   // Convert headers to a format compatible with Netlify functions
   const headers: Record<string, string> = {};
-  Object.entries(req.headers).forEach(([key, value]) => {
+  Object.entries(_req.headers).forEach(([key, value]) => {
     if (value !== undefined) {
       headers[key] = Array.isArray(value) ? value[0] : value;
     }
@@ -15,71 +16,39 @@ const convertRequest = (req: NextApiRequest) => {
 
   // Convert query parameters to a format compatible with Netlify functions
   const queryStringParameters: Record<string, string> = {};
-  Object.entries(req.query).forEach(([key, value]) => {
+  Object.entries(_req.query).forEach(([key, value]) => {
     if (value !== undefined) {
       queryStringParameters[key] = Array.isArray(value) ? value[0] : value;
     }
   });
 
+  // Ensure path is never undefined and convert undefined to null where needed
+  const path = _req.url || '/';
+  
   return {
-    body: req.body,
-    queryStringParameters,
+    httpMethod: 'POST',
     headers,
-    httpMethod: req.method || 'GET',
-    path: req.url || '/',
-    isBase64Encoded: false,
-    multiValueHeaders: {},
-    multiValueQueryStringParameters: {},
-    stageVariables: {},
-    requestContext: {
-      accountId: '',
-      apiId: '',
-      authorizer: {},
-      protocol: 'HTTP/1.1',
-      httpMethod: req.method || 'GET',
-      identity: {
-        accessKey: null,
-        accountId: null,
-        apiKey: null,
-        apiKeyId: null,
-        caller: null,
-        clientCert: null,
-        cognitoAuthenticationProvider: null,
-        cognitoAuthenticationType: null,
-        cognitoIdentityId: null,
-        cognitoIdentityPoolId: null,
-        principalOrgId: null,
-        sourceIp: req.socket.remoteAddress || '',
-        user: null,
-        userAgent: req.headers['user-agent'] || '',
-        userArn: null
-      },
-      path: req.url || '/',
-      stage: 'prod',
-      requestId: '',
-      requestTimeEpoch: Date.now(),
-      resourceId: '',
-      resourcePath: '',
-    },
-    resource: '',
+    queryStringParameters,
+    body: _req.body ? JSON.stringify(_req.body) : null,
+    path,
+    isBase64Encoded: false
   };
 };
 
 // Create a mock context for Netlify functions
-const createContext = () => {
+const createContext = (): HandlerContext => {
   return {
-    callbackWaitsForEmptyEventLoop: true,
-    functionName: 'render-api-handler',
-    functionVersion: '1.0',
-    invokedFunctionArn: 'arn:aws:lambda:us-east-1:123456789012:function:render-api-handler',
+    functionName: 'api-handler',
+    functionVersion: '$LATEST',
+    invokedFunctionArn: 'mock-arn',
     memoryLimitInMB: '1024',
     awsRequestId: 'mock-request-id',
-    logGroupName: '/aws/lambda/render-api-handler',
-    logStreamName: '2023/01/01/[$LATEST]mock-log-stream',
-    getRemainingTimeInMillis: () => 30000,
-    done: () => {},
-    fail: () => {},
-    succeed: () => {},
+    logGroupName: 'mock-log-group',
+    logStreamName: 'mock-log-stream',
+    getRemainingTimeInMillis: () => 10000,
+    done: (_error?: Error | null, _result?: any) => {},
+    fail: (_error: Error | string) => {},
+    succeed: (_messageOrObject: any) => {}
   };
 };
 
@@ -87,44 +56,41 @@ const createContext = () => {
 const safeJsonParse = (str: string) => {
   try {
     return JSON.parse(str);
-  } catch (error) {
-    console.error('Error parsing JSON:', error);
+  } catch (_error) {
+    console.error('Error parsing JSON:', _error);
     return { error: 'Invalid JSON response' };
   }
 };
 
 // API handler for all endpoints
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const path = req.url || '';
-  
   try {
+    const path = req.url || '';
+    
     // Route to the appropriate handler based on the path
-    if (path.startsWith('/api/analyze-conversation')) {
+    if (path.includes('/analyze-conversation')) {
       const netlifyReq = convertRequest(req);
       const context = createContext();
       const result = await analyzeConversationHandler(netlifyReq, context);
       const body = safeJsonParse(result.body);
       res.status(result.statusCode).json(body);
-    } 
-    else if (path.startsWith('/api/check-job-status')) {
+    } else if (path.includes('/check-job-status')) {
       const netlifyReq = convertRequest(req);
       const context = createContext();
       const result = await checkJobStatusHandler(netlifyReq, context);
       const body = safeJsonParse(result.body);
       res.status(result.statusCode).json(body);
-    }
-    else if (path.startsWith('/api/force-complete-job')) {
+    } else if (path.includes('/force-complete-job')) {
       const netlifyReq = convertRequest(req);
       const context = createContext();
       const result = await forceCompleteJobHandler(netlifyReq, context);
       const body = safeJsonParse(result.body);
       res.status(result.statusCode).json(body);
-    }
-    else {
+    } else {
       res.status(404).json({ error: 'Not found' });
     }
-  } catch (error) {
-    console.error('API handler error:', error);
+  } catch (_error) {
+    console.error('API handler error:', _error);
     res.status(500).json({ error: 'Internal server error' });
   }
 } 

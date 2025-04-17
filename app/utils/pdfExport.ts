@@ -25,17 +25,26 @@ const getPerformanceLevelColor = (score: number): string => {
   return '#dc2626'; // red-600
 };
 
-// Helper function to wrap text within margins and handle page breaks
+// Helper function to add wrapped text and return the height used
 const addWrappedText = (doc: jsPDF, text: string, x: number, y: number, maxWidth: number, bottomMargin: number): number => {
-  // Check if we need a new page
-  if (y > doc.internal.pageSize.getHeight() - bottomMargin) {
-    doc.addPage();
-    y = bottomMargin; // Reset Y to top margin of new page
-  }
-
   const lines = doc.splitTextToSize(text, maxWidth);
-  doc.text(lines, x, y);
-  return (lines.length - 1) * doc.getTextDimensions('Test').h; // Return total height of wrapped text
+  const lineHeight = doc.getTextDimensions('test').h * 1.2;
+  const totalHeight = lines.length * lineHeight;
+  
+  // Check if we need a new page
+  let currentY = y;
+  const pageHeight = doc.internal.pageSize.getHeight();
+  
+  lines.forEach((line: string) => {
+    if (currentY > pageHeight - bottomMargin) {
+      doc.addPage();
+      currentY = 20;
+    }
+    doc.text(line, x, currentY);
+    currentY += lineHeight;
+  });
+  
+  return totalHeight;
 };
 
 // Helper function to ensure we don't start a section too close to the bottom
@@ -50,7 +59,6 @@ const ensureSpace = (doc: jsPDF, currentY: number, neededSpace: number, topMargi
 export const exportEvaluationToPDF = async (evaluationData: EvaluationData) => {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
-  const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 20;
   const bottomMargin = 30;
   const textWidth = pageWidth - (margin * 2);
@@ -84,7 +92,7 @@ export const exportEvaluationToPDF = async (evaluationData: EvaluationData) => {
   });
   
   // Get the last Y position after the table
-  let currentY = (doc as any).lastAutoTable.finalY + 20;
+  let currentY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 20;
   
   // Strengths
   currentY = ensureSpace(doc, currentY, 100, margin, bottomMargin); // Ensure space for section

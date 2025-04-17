@@ -159,7 +159,7 @@ const DetailedResults: React.FC<DetailedResultsProps> = ({ evaluationData }) => 
                         <div className="bg-gray-50 p-4 rounded-md mb-4">
                           <h4 className="text-md font-semibold text-gray-900 mb-2">Specific Example</h4>
                           <blockquote className="text-gray-700 italic">
-                            "{extractExample(criterion.notes)}"
+                            &quot;{extractExample(criterion.notes)}&quot;
                           </blockquote>
                         </div>
                       )}

@@ -147,13 +147,13 @@ export default function DetailedResultsPage() {
   // Helper function to extract examples from notes
   const extractExample = (notes: string): string | null => {
     // Look for the pattern "Staff demonstrated [behavior] when they said: '[quote]'"
-    const match = notes.match(/Staff demonstrated[^:]*:?\s*['"]([^'"]+)['"]/i);
+    const match = notes.match(/Staff demonstrated[^:]*:?\s*[&apos;&apos;]([^&apos;&apos;]+)[&apos;&apos;]/i);
     if (match && match[1]) {
       return match[1].trim();
     }
     
     // Fallback to any quoted text
-    const quoteMatch = notes.match(/['"]([^'"]+)['"]/);
+    const quoteMatch = notes.match(/[&apos;&apos;]([^&apos;&apos;]+)[&apos;&apos;]/);
     if (quoteMatch && quoteMatch[1]) {
       return quoteMatch[1].trim();
     }

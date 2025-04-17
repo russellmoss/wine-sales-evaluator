@@ -25,11 +25,15 @@ export async function POST(request: NextRequest) {
     const prompt = `You are tasked with cleaning up and formatting a wine tasting conversation. This is a VERY important task and you MUST maintain the COMPLETE conversation without any truncation or summarization. Follow these rules exactly:
 
 1. Fix any spelling and grammar errors while maintaining the natural flow
-2. Keep all Staff: and Guest: prefixes
+2. Find the staff member's name in the conversation (usually introduced as "my name is [Name]" or similar) and replace "Staff:" with "[Name]:"
 3. Maintain every single interaction and detail - do not skip or summarize anything
 4. Use single line breaks between speakers
 5. Use at most double line breaks between major sections
-6. Format as clean markdown
+6. Format as clean markdown with these specific rules:
+   - Convert any text between single stars that describes actions (like *picks up glass*) to italics using markdown _picks up glass_
+   - Convert any text between double stars (like **Date:**) to bold using markdown **Date:**
+   - Remove ### from headers but make the text bold (e.g., "### Staff:" becomes "**Staff:**")
+   - All action descriptions and non-dialog text should be italicized (e.g., *nods appreciatively* becomes _nods appreciatively_)
 7. Do not add any commentary or additional text
 8. Do not truncate or shorten the conversation in any way
 9. Ensure the entire conversation is preserved from start to finish
@@ -38,7 +42,7 @@ Here's the conversation to clean up:
 
 ${markdown}
 
-Return the complete cleaned conversation exactly as is, just with fixed spelling/grammar and proper formatting.`;
+Return the complete cleaned conversation exactly as is, just with fixed spelling/grammar and proper markdown formatting.`;
 
     const result = await model.generateContent(prompt);
     const cleanedMarkdown = result.response.text();
@@ -143,58 +147,151 @@ async function generatePDF(markdown: string): Promise<Buffer> {
   const pageWidth = doc.internal.pageSize.width;
   const pageHeight = doc.internal.pageSize.height;
   const contentWidth = pageWidth - margin.left - margin.right;
-  const contentHeight = pageHeight - margin.top - margin.bottom;
 
-  // Set title
-  doc.setFontSize(20);
-  const title = 'Cleaned Wine Tasting Conversation';
-  const titleWidth = doc.getTextWidth(title);
-  doc.text(title, (pageWidth - titleWidth) / 2, margin.top);
+  // Font sizes and line heights
+  const fontSize = {
+    title: 16,
+    header: 14,
+    body: 12
+  };
+  const lineHeight = fontSize.body * 1.5;
 
-  // Set up text formatting
-  doc.setFontSize(12);
-  const lineHeight = 16;
-  let yPosition = margin.top + 40; // Start below title
+  let yPosition = margin.top;
+
+  // Helper function to write wrapped text
+  const writeWrappedText = (text: string, x: number, y: number, maxWidth: number): number => {
+    const words = text.split(' ');
+    let line = '';
+    let currentY = y;
+
+    for (const word of words) {
+      const testLine = line + (line ? ' ' : '') + word;
+      const testWidth = doc.getTextWidth(testLine);
+
+      if (testWidth > maxWidth) {
+        doc.text(line, x, currentY);
+        line = word;
+        currentY += lineHeight;
+
+        // Check for page break
+        if (currentY + lineHeight > pageHeight - margin.bottom) {
+          doc.addPage();
+          currentY = margin.top;
+        }
+      } else {
+        line = testLine;
+      }
+    }
+
+    // Write the last line
+    if (line) {
+      doc.text(line, x, currentY);
+      currentY += lineHeight;
+    }
+
+    return currentY;
+  };
 
   // Process each line
   const lines = markdown.split('\n');
-  for (const line of lines) {
-    const trimmedLine = line.trim();
-    
-    // Set color based on speaker
-    if (trimmedLine.startsWith('Staff:')) {
-      doc.setTextColor(0, 0, 255); // Blue for staff
-    } else if (trimmedLine.startsWith('Guest:')) {
-      doc.setTextColor(0, 100, 0); // Green for guest
-    } else {
-      doc.setTextColor(0, 0, 0); // Black for other text
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) {
+      yPosition += lineHeight / 2;
+      continue;
     }
 
-    if (trimmedLine) {
-      // Split long lines to fit within content width
-      const splitLines = doc.splitTextToSize(trimmedLine, contentWidth);
+    // Check for page break
+    if (yPosition + lineHeight > pageHeight - margin.bottom) {
+      doc.addPage();
+      yPosition = margin.top;
+    }
+
+    // Handle different line types
+    if (line.startsWith('# ')) {
+      // Main title
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(fontSize.title);
+      doc.setTextColor(0, 0, 0);
+      const text = line.substring(2);
+      const textWidth = doc.getTextWidth(text);
+      doc.text(text, (pageWidth - textWidth) / 2, yPosition);
+      yPosition += lineHeight * 1.5;
+    }
+    else if (line.startsWith('## ') || line.startsWith('### ')) {
+      // Section headers
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(fontSize.header);
+      doc.setTextColor(0, 0, 0);
+      const text = line.startsWith('## ') ? line.substring(3) : line.substring(4);
+      doc.text(text, margin.left, yPosition);
+      yPosition += lineHeight * 1.2;
+    }
+    else if (line.startsWith('**')) {
+      // Handle metadata and speaker lines differently
+      doc.setFontSize(fontSize.body);
+      const text = line.replace(/\*\*/g, '');
       
-      // Check if we need a new page before adding text
-      for (const splitLine of splitLines) {
-        // If we're about to exceed the bottom margin, add a new page
-        if (yPosition + lineHeight > pageHeight - margin.bottom) {
-          doc.addPage();
-          yPosition = margin.top; // Reset Y position to top margin of new page
+      if (text.includes('Guest:') || text.includes('Russell:')) {
+        // Speaker line - format name in bold and remove colon
+        const parts = text.split(':');
+        const speaker = parts[0];
+        const dialogue = parts[1] ? parts[1].trim() : '';
+        
+        // Write speaker name in bold with colon
+        doc.setFont('helvetica', 'bold');
+        if (speaker === 'Guest') {
+          doc.setTextColor(0, 100, 0); // Green for guest
+        } else {
+          doc.setTextColor(0, 0, 255); // Blue for Russell
         }
-
-        // Add the line with proper left margin
-        doc.text(splitLine, margin.left, yPosition);
-        yPosition += lineHeight;
-      }
-    } else {
-      // Add spacing for empty lines, but check for page break
-      if (yPosition + lineHeight / 2 > pageHeight - margin.bottom) {
-        doc.addPage();
-        yPosition = margin.top;
+        const speakerText = speaker + ':';
+        const speakerWidth = doc.getTextWidth(speakerText);
+        doc.text(speakerText, margin.left, yPosition);
+        
+        // Write dialogue in normal font
+        if (dialogue) {
+          doc.setFont('helvetica', 'normal');
+          doc.setTextColor(0, 0, 0); // Reset to black for dialogue
+          yPosition = writeWrappedText(dialogue, margin.left + speakerWidth + 10, yPosition, contentWidth - speakerWidth - 10);
+        } else {
+          yPosition += lineHeight;
+        }
       } else {
-        yPosition += lineHeight / 2;
+        // Regular metadata - keep bold
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(0, 0, 0);
+        yPosition = writeWrappedText(text, margin.left, yPosition, contentWidth);
       }
     }
+    else {
+      // Handle regular text with potential actions
+      doc.setFontSize(fontSize.body);
+      
+      // Split the line into parts, preserving action text
+      const parts = line.split(/(\*[^*]+\*)/);
+      let currentX = margin.left;
+      
+      for (const part of parts) {
+        if (part.startsWith('*') && part.endsWith('*')) {
+          // Action text
+          doc.setFont('helvetica', 'italic');
+          doc.setTextColor(90, 90, 90);
+          const actionText = part.slice(1, -1);
+          yPosition = writeWrappedText(actionText, currentX, yPosition, contentWidth - (currentX - margin.left));
+          currentX = margin.left; // Reset X position after action
+        } else if (part.trim()) {
+          // Regular text - check for speaker
+          doc.setFont('helvetica', 'normal');
+          doc.setTextColor(0, 0, 0); // Black for regular text
+          yPosition = writeWrappedText(part.trim(), currentX, yPosition, contentWidth - (currentX - margin.left));
+          currentX = margin.left; // Reset X position after text
+        }
+      }
+    }
+
+    // Add some spacing between paragraphs
+    yPosition += lineHeight * 0.5;
   }
 
   // Convert to Buffer

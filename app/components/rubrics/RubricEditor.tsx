@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'react-hot-toast';
 import { v4 as uuidv4 } from 'uuid';
 import type { Rubric, Criterion, PerformanceLevel } from '@/app/types/rubric';
@@ -37,35 +37,31 @@ const defaultPerformanceLevels: PerformanceLevel[] = [
 
 export default function RubricEditor({ rubricId, onSave, onCancel }: RubricEditorProps) {
   const isEditing = !!rubricId;
+  
+  // Form state
+  const [formData, setFormData] = useState<Partial<Rubric>>({
+    name: '',
+    description: '',
+    isDefault: false,
+    criteria: [],
+    performanceLevels: []
+  });
+  
+  // UI state
   const [loading, setLoading] = useState(isEditing);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showCancelConfirmation, setShowCancelConfirmation] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
-  
-  const [formData, setFormData] = useState<Partial<Rubric>>({
-    name: '',
-    description: '',
-    isDefault: false,
-    criteria: [createEmptyCriterion()],
-    performanceLevels: defaultPerformanceLevels
-  });
 
-  // Calculate total weight from all criteria
-  const totalWeight = formData.criteria?.reduce((sum, criterion) => sum + (criterion.weight || 0), 0) || 0;
-  const isWeightValid = totalWeight === 100;
-
-  useEffect(() => {
-    if (isEditing) {
-      loadRubric();
-    }
-  }, [isEditing, rubricId]);
-
-  const loadRubric = async () => {
+  // Load existing rubric function
+  const loadRubric = useCallback(async () => {
+    if (!rubricId) return;
+    
     try {
       setLoading(true);
       setError(null);
-      const data = await RubricApi.getRubric(rubricId!);
+      const data = await RubricApi.getRubric(rubricId);
       setFormData(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load rubric');
@@ -73,7 +69,33 @@ export default function RubricEditor({ rubricId, onSave, onCancel }: RubricEdito
     } finally {
       setLoading(false);
     }
-  };
+  }, [rubricId]);
+
+  // Load existing rubric if editing
+  useEffect(() => {
+    if (isEditing) {
+      loadRubric();
+    } else {
+      // Initialize with default structure for new rubric
+      setFormData({
+        name: '',
+        description: '',
+        isDefault: false,
+        criteria: [createEmptyCriterion()],
+        performanceLevels: [
+          { name: 'Exceptional', minScore: 90, maxScore: 100, description: 'Outstanding performance' },
+          { name: 'Strong', minScore: 80, maxScore: 90, description: 'Very good performance' },
+          { name: 'Proficient', minScore: 70, maxScore: 80, description: 'Solid performance' },
+          { name: 'Developing', minScore: 60, maxScore: 70, description: 'Basic performance' },
+          { name: 'Needs Improvement', minScore: 0, maxScore: 60, description: 'Requires substantial improvement' }
+        ]
+      });
+    }
+  }, [isEditing, loadRubric]);
+
+  // Calculate total weight from all criteria
+  const totalWeight = formData.criteria?.reduce((sum, criterion) => sum + (criterion.weight || 0), 0) || 0;
+  const isWeightValid = totalWeight === 100;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

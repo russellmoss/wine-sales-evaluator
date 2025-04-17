@@ -5,7 +5,7 @@ services:
     buildCommand: npm ci --include=dev && npm run build && chmod +x render-setup.sh
     startCommand: ./render-setup.sh && node server.js
     healthCheckPath: /api/health
-    # Define a persistent disk for job storage
+    # Define a persistent disk for storage
     disk:
       name: wine-evaluator-data
       mountPath: /var/data
@@ -17,8 +17,10 @@ services:
         value: "true"
       - key: CLAUDE_API_KEY
         sync: false # This will be set via Render dashboard
+      - key: GEMINI_API_KEY
+        sync: false # This will be set via Render dashboard
       - key: RENDER_STORAGE_DIR
-        value: /var/data/jobs
+        value: /var/data/storage
       - key: JOB_STORAGE_TYPE
         value: file
       - key: JOB_MAX_AGE
@@ -31,5 +33,5 @@ services:
     buildEnv:
       - key: NEXT_TELEMETRY_DISABLED
         value: "1"
-    # Auto-deploy settings (optional)
+    # Auto-deploy settings
     autoDeploy: true 
