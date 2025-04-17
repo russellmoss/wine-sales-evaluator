@@ -4,7 +4,8 @@ import fs from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { getStorageProvider, JobStatus } from '../../app/utils/storage';
-import { getPerformanceLevelFromScore } from '../../app/utils/validation';
+import { validateEvaluationData } from '../../app/utils/validation';
+import { Rubric } from '../../app/types/rubric';
 
 // Timeout constants in milliseconds
 const TIMEOUTS = {
@@ -14,10 +15,10 @@ const TIMEOUTS = {
   RETRY_DELAY: 1000       // 1 second delay between retries
 };
 
-// Add rate limiting constants
+// Rate limiting configuration
 const RATE_LIMIT = {
   MAX_REQUESTS_PER_MINUTE: 10,
-  REQUEST_WINDOW_MS: 60000, // 1 minute
+  REQUEST_WINDOW_MS: 60 * 1000, // 1 minute in milliseconds
   lastRequestTime: 0
 };
 
@@ -44,22 +45,6 @@ async function withTimeout<T>(
 
   return Promise.race([promise, timeoutPromise]);
 }
-
-// Validate required environment variables
-const validateEnvironment = (): { isValid: boolean; missingVars: string[] } => {
-  const requiredVars = [
-    'CLAUDE_API_KEY',
-    'JOB_STORAGE_TYPE',
-    'JOB_MAX_AGE'
-  ];
-
-  const missingVars = requiredVars.filter(varName => !process.env[varName]);
-  
-  return {
-    isValid: missingVars.length === 0,
-    missingVars
-  };
-};
 
 // Add diagnostic logging
 console.log('Background function: Starting with environment:', {
@@ -184,33 +169,6 @@ const anthropic = new Anthropic({
 // Add a function to check if we're in development mode
 const isDevelopmentMode = () => {
   return process.env.NODE_ENV === 'development' || process.env.NETLIFY_DEV === 'true';
-};
-
-// Add a function to get the API key with fallback for development
-const getClaudeApiKey = () => {
-  const apiKey = process.env.CLAUDE_API_KEY;
-  
-  // Log API key status (without exposing the actual key)
-  if (apiKey) {
-    console.log(`[${new Date().toISOString()}] Claude API: API key found (length: ${apiKey.length})`);
-    // Check if the key has the expected format
-    if (apiKey.startsWith('sk-ant-')) {
-      console.log(`[${new Date().toISOString()}] Claude API: API key format looks valid`);
-    } else {
-      console.warn(`[${new Date().toISOString()}] Claude API: WARNING - API key format may be invalid (should start with 'sk-ant-')`);
-    }
-  } else {
-    console.warn(`[${new Date().toISOString()}] Claude API: WARNING - API key not found in environment variables`);
-    
-    // For development mode, provide a more helpful error message
-    if (isDevelopmentMode()) {
-      console.warn(`[${new Date().toISOString()}] Claude API: WARNING - Running in development mode without API key`);
-      console.warn(`[${new Date().toISOString()}] Claude API: WARNING - Please set CLAUDE_API_KEY in your .env.local file`);
-      console.warn(`[${new Date().toISOString()}] Claude API: WARNING - Example: CLAUDE_API_KEY=sk-ant-api03-...`);
-    }
-  }
-  
-  return apiKey;
 };
 
 // Embedded rubric and example evaluation
@@ -432,41 +390,33 @@ const EMBEDDED_EVALUATION_EXAMPLE = {
 };
 
 // Function to load the rubric from the markdown file
-async function loadRubric(): Promise<string> {
-  console.log('Loading rubric from markdown file');
-  
-  // Check if we have a cached version
-  if (cachedRubric) {
-    console.log('Using cached rubric');
-    return cachedRubric;
-  }
-  
+async function loadRubric(rubricId?: string): Promise<Rubric | null> {
   try {
-    // Try to read the rubric from the markdown file
-    const rubricPath = path.join(process.cwd(), 'public', 'data', 'wines_sales_rubric.md');
-    console.log(`Looking for rubric at: ${rubricPath}`);
+    console.log(`Loading rubric: ${rubricId || 'default'}`);
+    const storage = getStorageProvider();
     
-    if (fs.existsSync(rubricPath)) {
-      console.log('Rubric file found, reading contents');
-      const rubricContent = fs.readFileSync(rubricPath, 'utf8');
-      console.log(`Loaded rubric with ${rubricContent.length} characters`);
-      console.log(`Rubric content preview: ${rubricContent.substring(0, 200)}...`);
-      
-      // Cache the rubric for future use
-      cachedRubric = rubricContent;
-      return rubricContent;
-    } else {
-      console.log('Rubric file not found, using embedded rubric');
-      console.log(`Current working directory: ${process.cwd()}`);
-      console.log(`Directory contents: ${fs.readdirSync(process.cwd()).join(', ')}`);
-      console.log(`Public directory contents: ${fs.existsSync(path.join(process.cwd(), 'public')) ? fs.readdirSync(path.join(process.cwd(), 'public')).join(', ') : 'Public directory not found'}`);
-      console.log(`Data directory contents: ${fs.existsSync(path.join(process.cwd(), 'public', 'data')) ? fs.readdirSync(path.join(process.cwd(), 'public', 'data')).join(', ') : 'Data directory not found'}`);
-      return EMBEDDED_RUBRIC;
+    if (rubricId) {
+      // Load the specific rubric
+      const rubric = await storage.getRubric(rubricId);
+      if (rubric) {
+        console.log(`Found rubric: ${rubric.name}`);
+        return rubric;
+      }
+      console.log(`Rubric not found: ${rubricId}, falling back to default`);
     }
+    
+    // Fall back to default rubric
+    const defaultRubric = await storage.getDefaultRubric();
+    if (defaultRubric) {
+      console.log(`Using default rubric: ${defaultRubric.name}`);
+      return defaultRubric;
+    }
+    
+    console.log('No default rubric found');
+    return null;
   } catch (error) {
     console.error('Error loading rubric:', error);
-    console.log('Using embedded rubric as fallback');
-    return EMBEDDED_RUBRIC;
+    return null;
   }
 }
 
@@ -484,24 +434,23 @@ const loadEvaluationExample = () => {
   return cachedEvaluationExample;
 };
 
-interface CriteriaScore {
-  criterion: string;
-  weight: number;
-  score: number;
-  weightedScore: number;
-  notes: string;
-}
-
+// Define the EvaluationData type locally to avoid conflicts
 interface EvaluationData {
   staffName: string;
   date: string;
   overallScore: number;
-  totalScore?: number; // Optional field that might be used instead of overallScore
   performanceLevel: 'Exceptional' | 'Strong' | 'Proficient' | 'Developing' | 'Needs Improvement';
-  criteriaScores: CriteriaScore[];
+  criteriaScores: {
+    criterion: string;
+    score: number;
+    weight: number;
+    weightedScore: number;
+    notes: string;
+  }[];
   strengths: string[];
   areasForImprovement: string[];
   keyRecommendations: string[];
+  rubricId?: string;
 }
 
 // Helper function to process Claude's response and extract JSON
@@ -536,181 +485,6 @@ function processCloudeResponse(responseText: string): string {
   
   console.log('No JSON found in response, returning original text');
   return responseText.trim();
-}
-
-// Helper function to fix or create a valid evaluation data structure
-function validateAndRepairEvaluationData(data: any, markdown: string): EvaluationData {
-  console.log('Validating and repairing evaluation data');
-  
-  // Create a fallback object
-  const fallbackData: EvaluationData = {
-    staffName: "Unknown Staff",
-    date: new Date().toISOString().split('T')[0],
-    overallScore: 0,
-    performanceLevel: "Needs Improvement",
-    criteriaScores: [],
-    strengths: [
-      "Not available due to processing error",
-      "Please try again with the conversation",
-      "Consider reviewing the conversation manually"
-    ],
-    areasForImprovement: [
-      "Not available due to processing error",
-      "Please try again with the conversation",
-      "Consider reviewing the conversation manually"
-    ],
-    keyRecommendations: [
-      "Not available due to processing error",
-      "Please try again with the conversation",
-      "Consider reviewing the conversation manually"
-    ]
-  };
-  
-  // Try to extract staff name from the markdown if missing
-  if (!data?.staffName) {
-    console.log('Staff name missing, attempting to extract from markdown');
-    const staffNameMatch = markdown.match(/Staff(?:\s+Member)?(?:\s+\(\d+\))?[:\s]+([^\n]+)/i);
-    if (staffNameMatch && staffNameMatch[1]) {
-      const nameMatch = staffNameMatch[1].match(/(?:hi|hello|hey)[\s,]+(?:my name is|i'm|i am)\s+([^\s,\.]+)/i);
-      fallbackData.staffName = nameMatch && nameMatch[1] ? nameMatch[1].trim() : staffNameMatch[1].trim();
-      console.log(`Extracted staff name: ${fallbackData.staffName}`);
-    }
-  } else {
-    fallbackData.staffName = data.staffName;
-    console.log(`Using provided staff name: ${fallbackData.staffName}`);
-  }
-  
-  // Try to extract date from the markdown if missing
-  if (!data?.date) {
-    console.log('Date missing, attempting to extract from markdown');
-    const dateMatch = markdown.match(/Date:?\s+(\d{1,2}\/\d{1,2}\/\d{4}|\d{4}-\d{2}-\d{2})/i);
-    if (dateMatch && dateMatch[1]) {
-      fallbackData.date = dateMatch[1];
-      console.log(`Extracted date: ${fallbackData.date}`);
-    }
-  } else {
-    fallbackData.date = data.date;
-    console.log(`Using provided date: ${fallbackData.date}`);
-  }
-  
-  // Try to use whatever data is available
-  if (data) {
-    console.log('Processing available data fields');
-    
-    // Handle score fields
-    if (data.overallScore !== undefined) {
-      console.log(`Using overallScore: ${data.overallScore}`);
-      fallbackData.overallScore = typeof data.overallScore === 'string' ? 
-        parseFloat(data.overallScore) : data.overallScore;
-    } else if (data.totalScore !== undefined) {
-      console.log(`Using totalScore as overallScore: ${data.totalScore}`);
-      fallbackData.overallScore = typeof data.totalScore === 'string' ? 
-        parseFloat(data.totalScore) : data.totalScore;
-    }
-    
-    // Handle performance level
-    if (data.performanceLevel) {
-      console.log(`Using performanceLevel: ${data.performanceLevel}`);
-      fallbackData.performanceLevel = data.performanceLevel;
-    }
-    
-    // Handle criteria scores
-    if (Array.isArray(data.criteriaScores)) {
-      console.log(`Using criteriaScores array with ${data.criteriaScores.length} items`);
-      
-      // Ensure we have at least some criteria scores
-      if (data.criteriaScores.length > 0) {
-        // Process each criteria score to ensure it has the required fields
-        fallbackData.criteriaScores = data.criteriaScores.map((score: any, index: number) => {
-          // Create a valid criteria score object
-          const validScore: CriteriaScore = {
-            criterion: score.criterion || `Criterion ${index + 1}`,
-            weight: typeof score.weight === 'number' ? score.weight : 
-                   typeof score.weight === 'string' ? parseFloat(score.weight) : 8,
-            score: typeof score.score === 'number' ? score.score : 
-                  typeof score.score === 'string' ? parseFloat(score.score) : 3,
-            weightedScore: typeof score.weightedScore === 'number' ? score.weightedScore : 
-                          typeof score.weightedScore === 'string' ? parseFloat(score.weightedScore) : 24,
-            notes: score.notes || 'No notes provided'
-          };
-          
-          // Calculate weighted score if not provided
-          if (isNaN(validScore.weightedScore)) {
-            validScore.weightedScore = validScore.score * validScore.weight;
-          }
-          
-          return validScore;
-        });
-      }
-    }
-    
-    // Handle arrays with more flexible validation
-    ['strengths', 'areasForImprovement', 'keyRecommendations'].forEach(field => {
-      const arrayField = field as keyof Pick<EvaluationData, 'strengths' | 'areasForImprovement' | 'keyRecommendations'>;
-      if (Array.isArray(data[arrayField]) && data[arrayField].length > 0) {
-        console.log(`Using ${field} array with ${data[arrayField].length} items`);
-        fallbackData[arrayField] = data[arrayField];
-      }
-    });
-  }
-  
-  // Ensure we have at least 10 criteria scores
-  if (fallbackData.criteriaScores.length < 10) {
-    console.log(`Adding ${10 - fallbackData.criteriaScores.length} default criteria scores`);
-    
-    // Default criteria if we don't have enough
-    const defaultCriteria = [
-      { criterion: "Initial Greeting and Welcome", weight: 8 },
-      { criterion: "Wine Knowledge and Recommendations", weight: 10 },
-      { criterion: "Customer Engagement", weight: 10 },
-      { criterion: "Sales Techniques", weight: 10 },
-      { criterion: "Upselling and Cross-selling", weight: 8 },
-      { criterion: "Handling Customer Questions", weight: 8 },
-      { criterion: "Personalization", weight: 8 },
-      { criterion: "Closing the Sale", weight: 8 },
-      { criterion: "Follow-up and Future Business", weight: 8 },
-      { criterion: "Closing Interaction", weight: 8 }
-    ];
-    
-    // Add missing criteria
-    for (let i = fallbackData.criteriaScores.length; i < 10; i++) {
-      const defaultCriterion = defaultCriteria[i - fallbackData.criteriaScores.length];
-      fallbackData.criteriaScores.push({
-        criterion: defaultCriterion.criterion,
-        weight: defaultCriterion.weight,
-        score: 3,
-        weightedScore: defaultCriterion.weight * 3,
-        notes: "Default criteria added due to missing data"
-      });
-    }
-  }
-  
-  // Calculate overall score if not set
-  if (fallbackData.overallScore === 0 && fallbackData.criteriaScores.length > 0) {
-    console.log('Calculating overall score from criteria scores');
-    const totalWeightedScore = fallbackData.criteriaScores.reduce((sum, criterion) => {
-      return sum + criterion.weightedScore;
-    }, 0);
-    
-    // Calculate the total possible score (sum of all weights)
-    const totalPossibleScore = fallbackData.criteriaScores.reduce((sum, criterion) => {
-      return sum + criterion.weight;
-    }, 0);
-    
-    // Calculate the overall score as a percentage
-    fallbackData.overallScore = Math.round((totalWeightedScore / totalPossibleScore) * 100);
-    console.log(`Calculated overall score: ${fallbackData.overallScore}% (${totalWeightedScore}/${totalPossibleScore})`);
-  }
-  
-  // Set performance level based on overall score
-  if (fallbackData.overallScore >= 90) fallbackData.performanceLevel = "Exceptional";
-  else if (fallbackData.overallScore >= 80) fallbackData.performanceLevel = "Strong";
-  else if (fallbackData.overallScore >= 70) fallbackData.performanceLevel = "Proficient";
-  else if (fallbackData.overallScore >= 60) fallbackData.performanceLevel = "Developing";
-  else fallbackData.performanceLevel = "Needs Improvement";
-  
-  console.log(`Final performance level: ${fallbackData.performanceLevel}`);
-  return fallbackData;
 }
 
 // Helper function to save debug information
@@ -864,43 +638,13 @@ const truncateConversation = (markdown: string, maxLength: number = 8000): strin
   return `[Note: Conversation truncated for analysis. Showing middle section.]\n\n${truncated}\n\n[End of truncated conversation]`;
 };
 
-interface EvaluationResult {
-  staffName: string;
-  date: string;
-  overallScore: number;
-  performanceLevel: 'Exceptional' | 'Strong' | 'Proficient' | 'Developing' | 'Needs Improvement';
-  criteriaScores: {
-    criterion: string;
-    score: number;
-    weight: number;
-    weightedScore: number;
-    notes: string;
-  }[];
-  strengths: string[];
-  areasForImprovement: string[];
-  keyRecommendations: string[];
-}
-
-// Function to enforce rate limiting
-async function enforceRateLimit() {
-  const now = Date.now();
-  const timeSinceLastRequest = now - RATE_LIMIT.lastRequestTime;
-  
-  if (timeSinceLastRequest < RATE_LIMIT.REQUEST_WINDOW_MS / RATE_LIMIT.MAX_REQUESTS_PER_MINUTE) {
-    const delayMs = (RATE_LIMIT.REQUEST_WINDOW_MS / RATE_LIMIT.MAX_REQUESTS_PER_MINUTE) - timeSinceLastRequest;
-    console.log(`Rate limiting: Waiting ${delayMs}ms before next request`);
-    await new Promise(resolve => setTimeout(resolve, delayMs));
-  }
-  
-  RATE_LIMIT.lastRequestTime = Date.now();
-}
-
 // Function to analyze conversation with Claude API
 async function analyzeConversationWithClaude(
   conversation: string,
   staffName: string,
-  date: string
-): Promise<EvaluationResult> {
+  date: string,
+  rubricId?: string
+): Promise<EvaluationData> {
   console.log('Starting conversation analysis with Claude');
   
   // Validate environment variables
@@ -916,22 +660,25 @@ async function analyzeConversationWithClaude(
     throw new Error('Claude API key is missing. Please set CLAUDE_API_KEY in your environment variables.');
   }
   
-  // Load the rubric
-  const rubric = await loadRubric();
-  console.log('Loaded rubric for analysis');
+  // First try to load the specified rubric or fall back to default
+  const rubric = await loadRubric(rubricId);
   
-  // Prepare the prompt
+  if (!rubric) {
+    throw new Error('No rubric found for evaluation');
+  }
+  
+  // Prepare the prompt with the rubric
   const prompt = `You are an expert wine sales trainer evaluating a conversation between a winery staff member and a guest.
 
 IMPORTANT INSTRUCTIONS:
-1. Use the EXACT criteria and scoring guidelines from the rubric below
+1. Use the EXACT criteria and scoring guidelines from the provided rubric
 2. For each criterion, provide a score (1-5) and detailed justification
 3. Calculate the weighted score for each criterion using the weights specified
 4. Determine the overall performance level based on the total weighted score
 5. Provide specific examples from the conversation to support your evaluation
 
-RUBRIC:
-${rubric}
+RUBRIC TO USE:
+${JSON.stringify(rubric, null, 2)}
 
 CONVERSATION TO EVALUATE:
 ${conversation}
@@ -956,14 +703,15 @@ Please provide your evaluation in the following JSON format:
   ],
   "strengths": string[],
   "areasForImprovement": string[],
-  "keyRecommendations": string[]
+  "keyRecommendations": string[],
+  "rubricId": "${rubric.id}"
 }`;
 
   try {
     // Enforce rate limiting before making the API call
     await enforceRateLimit();
     
-    console.log('Sending request to Claude API');
+    console.log('Sending request to Claude API with rubric:', rubric.id);
     const response = await anthropic.messages.create({
       model: 'claude-3-7-sonnet-20250219',
       max_tokens: 4000,
@@ -977,7 +725,8 @@ Please provide your evaluation in the following JSON format:
     });
     
     console.log('Received response from Claude API');
-    const result = response.content[0].text;
+    const content = response.content[0];
+    const result = typeof content === 'object' && 'text' in content ? content.text : String(content);
     console.log('Processing Claude response');
     
     try {
@@ -991,10 +740,18 @@ Please provide your evaluation in the following JSON format:
         evaluation = JSON.parse(jsonString);
       }
       
-      // Validate and repair the evaluation data
-      const validatedData = validateAndRepairEvaluationData(evaluation, conversation);
-      console.log('Successfully processed evaluation result');
-      return validatedData;
+      // Add the rubricId to the evaluation data
+      evaluation.rubricId = rubric.id;
+      
+      // Validate the evaluation data
+      const validationResult = validateEvaluationData(evaluation);
+      if (!validationResult.isValid) {
+        console.warn('Validation issues found:', validationResult.errors);
+        throw new Error('Invalid evaluation data: ' + validationResult.errors.join(', '));
+      }
+      
+      // Return the validated evaluation data
+      return evaluation as EvaluationData;
     } catch (error) {
       console.error('Error processing Claude response:', error);
       throw new Error('Failed to process Claude response');
@@ -1030,7 +787,7 @@ export const handler: Handler = async (event: HandlerEvent, context: HandlerCont
   
   try {
     // Parse the request body
-    const { jobId, conversation, staffName, date } = JSON.parse(event.body || '{}');
+    const { jobId, conversation, staffName, date, rubricId } = JSON.parse(event.body || '{}');
     
     // Validate required fields
     if (!jobId) {
@@ -1065,11 +822,12 @@ export const handler: Handler = async (event: HandlerEvent, context: HandlerCont
     await storage.saveJob(job);
     console.log(`[${new Date().toISOString()}] Background function: Updated job ${jobId} status to processing`);
     
-    // Analyze the conversation with Claude
+    // Analyze the conversation with Claude, passing the rubricId
     const evaluationResult = await analyzeConversationWithClaude(
       conversation,
       staffName,
-      date
+      date,
+      rubricId || job.rubricId // Use the rubricId from the request or job
     );
     
     // Update job with the evaluation result

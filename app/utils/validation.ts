@@ -142,7 +142,8 @@ export function validateEvaluationData(data: any): ValidationResult {
     observationalNotes: DEFAULT_OBSERVATIONAL_NOTES,
     strengths: [...DEFAULT_ARRAY_VALUES.strengths],
     areasForImprovement: [...DEFAULT_ARRAY_VALUES.areasForImprovement],
-    keyRecommendations: [...DEFAULT_ARRAY_VALUES.keyRecommendations]
+    keyRecommendations: [...DEFAULT_ARRAY_VALUES.keyRecommendations],
+    rubricId: ''
   };
   
   // Check for required fields
@@ -211,6 +212,11 @@ export function validateEvaluationData(data: any): ValidationResult {
     validData.keyRecommendations = data.keyRecommendations;
   } else {
     errors.push({ field: "keyRecommendations", message: "Missing or invalid keyRecommendations" });
+  }
+  
+  // Validate rubricId
+  if (data.rubricId && typeof data.rubricId === 'string') {
+    validData.rubricId = data.rubricId;
   }
   
   // Try to extract staff name from markdown or filename if missing

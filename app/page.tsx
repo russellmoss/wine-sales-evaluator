@@ -1,5 +1,9 @@
-import React from 'react';
-import WineEvaluationDashboard from '../components/WineEvaluationDashboard';
+import dynamic from 'next/dynamic';
+
+const WineEvaluationDashboard = dynamic(
+  () => import('./components/WineEvaluationDashboard'),
+  { ssr: false }
+);
 
 export default function Home() {
   return (

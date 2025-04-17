@@ -33,6 +33,7 @@ export interface EvaluationData {
   strengths: string[];              // Array of exactly 3 strengths
   areasForImprovement: string[];    // Array of exactly 3 areas for improvement
   keyRecommendations: string[];     // Array of exactly 3 key recommendations
+  rubricId: string;
   
   // Optional fields
   totalScore?: number;              // Alternative field for overallScore (will be converted)
@@ -173,6 +174,7 @@ export function createEmptyEvaluation(staffName: string): EvaluationData {
     },
     strengths: [],
     areasForImprovement: [],
-    keyRecommendations: []
+    keyRecommendations: [],
+    rubricId: ''
   };
 } 

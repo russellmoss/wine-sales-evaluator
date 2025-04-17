@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
+import { Rubric } from '../types/rubric';
 
 // Define the job status interface
 export interface JobStatus {
@@ -19,24 +20,37 @@ export interface JobStatus {
   expiresAt?: number; // Optional expiration timestamp
   markdown?: string; // The markdown content to analyze
   fileName?: string; // The name of the file being analyzed
+  rubricId?: string; // New field to track which rubric was used for evaluation
 }
 
 // Storage provider interface
 export interface StorageProvider {
+  // Job management methods
   saveJob(job: JobStatus): Promise<void>;
   getJob(jobId: string): Promise<JobStatus | null>;
   listJobs(): Promise<JobStatus[]>;
   deleteJob(jobId: string): Promise<boolean>;
   cleanupExpiredJobs(): Promise<number>;
+  
+  // Rubric management methods
+  saveRubric(rubric: Rubric): Promise<void>;
+  getRubric(rubricId: string): Promise<Rubric | null>;
+  listRubrics(): Promise<Rubric[]>;
+  deleteRubric(rubricId: string): Promise<boolean>;
+  getDefaultRubric(): Promise<Rubric | null>;
+  setDefaultRubric(rubricId: string): Promise<boolean>;
 }
 
 // Memory storage provider for local development
 export class MemoryStorageProvider implements StorageProvider {
   private static instance: MemoryStorageProvider;
   private jobs: Map<string, JobStatus>;
+  private rubrics: Map<string, Rubric>;
+  private defaultRubricId?: string;
 
   constructor() {
     this.jobs = new Map();
+    this.rubrics = new Map();
   }
 
   public static getInstance(): MemoryStorageProvider {
@@ -89,22 +103,134 @@ export class MemoryStorageProvider implements StorageProvider {
     console.log(`Memory Storage: Cleaned up ${count} expired jobs`);
     return count;
   }
+
+  // New rubric management methods
+  async saveRubric(rubric: Rubric): Promise<void> {
+    console.log(`Memory Storage: Saving rubric ${rubric.id}`);
+    this.rubrics.set(rubric.id, rubric);
+    
+    // Handle default rubric logic
+    if (rubric.isDefault || !this.defaultRubricId) {
+      this.defaultRubricId = rubric.id;
+      
+      // Ensure only one rubric is marked as default
+      if (rubric.isDefault) {
+        for (const [id, otherRubric] of this.rubrics.entries()) {
+          if (id !== rubric.id && otherRubric.isDefault) {
+            otherRubric.isDefault = false;
+            this.rubrics.set(id, otherRubric);
+          }
+        }
+      }
+    }
+    
+    console.log(`Memory Storage: Rubric ${rubric.id} saved successfully`);
+  }
+
+  async getRubric(rubricId: string): Promise<Rubric | null> {
+    console.log(`Memory Storage: Retrieving rubric ${rubricId}`);
+    const rubric = this.rubrics.get(rubricId);
+    
+    if (rubric) {
+      console.log(`Memory Storage: Found rubric ${rubricId}`);
+    } else {
+      console.log(`Memory Storage: Rubric ${rubricId} not found`);
+    }
+    
+    return rubric || null;
+  }
+
+  async listRubrics(): Promise<Rubric[]> {
+    console.log('Memory Storage: Listing all rubrics');
+    return Array.from(this.rubrics.values());
+  }
+
+  async deleteRubric(rubricId: string): Promise<boolean> {
+    console.log(`Memory Storage: Deleting rubric ${rubricId}`);
+    
+    // Check if this is the default rubric
+    if (this.defaultRubricId === rubricId) {
+      // Find another rubric to set as default
+      const otherRubrics = Array.from(this.rubrics.values())
+        .filter(r => r.id !== rubricId);
+        
+      if (otherRubrics.length > 0) {
+        // Set the first available rubric as default
+        this.defaultRubricId = otherRubrics[0].id;
+        otherRubrics[0].isDefault = true;
+        this.rubrics.set(otherRubrics[0].id, otherRubrics[0]);
+      } else {
+        // No other rubrics, clear default
+        this.defaultRubricId = undefined;
+      }
+    }
+    
+    const deleted = this.rubrics.delete(rubricId);
+    console.log(`Memory Storage: Rubric ${rubricId} ${deleted ? 'deleted successfully' : 'not found'}`);
+    return deleted;
+  }
+
+  async getDefaultRubric(): Promise<Rubric | null> {
+    console.log('Memory Storage: Retrieving default rubric');
+    
+    if (!this.defaultRubricId) {
+      console.log('Memory Storage: No default rubric set');
+      return null;
+    }
+    
+    const defaultRubric = this.rubrics.get(this.defaultRubricId);
+    
+    if (defaultRubric) {
+      console.log(`Memory Storage: Found default rubric ${this.defaultRubricId}`);
+    } else {
+      console.log(`Memory Storage: Default rubric ${this.defaultRubricId} not found`);
+    }
+    
+    return defaultRubric || null;
+  }
+
+  async setDefaultRubric(rubricId: string): Promise<boolean> {
+    console.log(`Memory Storage: Setting default rubric to ${rubricId}`);
+    
+    const rubric = this.rubrics.get(rubricId);
+    if (!rubric) {
+      console.log(`Memory Storage: Rubric ${rubricId} not found, cannot set as default`);
+      return false;
+    }
+    
+    // Update all rubrics to ensure only one is marked as default
+    for (const [id, otherRubric] of this.rubrics.entries()) {
+      if (id === rubricId) {
+        otherRubric.isDefault = true;
+      } else {
+        otherRubric.isDefault = false;
+      }
+      this.rubrics.set(id, otherRubric);
+    }
+    
+    this.defaultRubricId = rubricId;
+    console.log(`Memory Storage: Rubric ${rubricId} set as default successfully`);
+    return true;
+  }
 }
 
 // File-based storage provider for local development
 export class FileStorageProvider implements StorageProvider {
   private jobsDir: string;
+  private rubricsDir: string;
   private maxAge: number;
   private retryAttempts: number;
   private retryDelay: number;
 
   constructor(jobsDir: string, maxAge: number) {
     this.jobsDir = jobsDir;
+    this.rubricsDir = path.join(path.dirname(jobsDir), 'rubrics');
     this.maxAge = maxAge;
     this.retryAttempts = 3;
-    this.retryDelay = 1000; // 1 second
-    console.log(`FileStorageProvider: Initializing with jobsDir=${jobsDir}, maxAge=${maxAge}`);
+    this.retryDelay = 1000;
+    console.log(`FileStorageProvider: Initializing with jobsDir=${jobsDir}, rubricsDir=${this.rubricsDir}, maxAge=${maxAge}`);
     this.ensureJobsDir();
+    this.ensureRubricsDir();
   }
 
   private ensureJobsDir(): void {
@@ -123,6 +249,24 @@ export class FileStorageProvider implements StorageProvider {
     } catch (error) {
       console.error(`FileStorageProvider: Error creating jobs directory: ${this.jobsDir}`, error);
       throw new Error(`Failed to create jobs directory: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  private ensureRubricsDir(): void {
+    try {
+      console.log(`FileStorageProvider: Checking if rubrics directory exists: ${this.rubricsDir}`);
+      if (!fs.existsSync(this.rubricsDir)) {
+        console.log(`FileStorageProvider: Creating rubrics directory: ${this.rubricsDir}`);
+        fs.mkdirSync(this.rubricsDir, { recursive: true });
+        console.log(`FileStorageProvider: Rubrics directory created successfully`);
+      } else {
+        console.log(`FileStorageProvider: Rubrics directory already exists`);
+        const files = fs.readdirSync(this.rubricsDir);
+        console.log(`FileStorageProvider: Directory contains ${files.length} files:`, files);
+      }
+    } catch (error) {
+      console.error(`FileStorageProvider: Error creating rubrics directory: ${this.rubricsDir}`, error);
+      throw new Error(`Failed to create rubrics directory: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -410,6 +554,236 @@ export class FileStorageProvider implements StorageProvider {
       return 0;
     }
   }
+
+  // Rubric management methods
+  async saveRubric(rubric: Rubric): Promise<void> {
+    this.ensureRubricsDir();
+    
+    const rubricPath = path.join(this.rubricsDir, `${rubric.id}.json`);
+    
+    try {
+      console.log(`FileStorageProvider: Saving rubric ${rubric.id} to ${rubricPath}`);
+      
+      // Handle default rubric logic
+      if (rubric.isDefault) {
+        // If this rubric is being set as default, ensure no other rubric is marked as default
+        const existingRubrics = await this.listRubrics();
+        for (const existingRubric of existingRubrics) {
+          if (existingRubric.id !== rubric.id && existingRubric.isDefault) {
+            existingRubric.isDefault = false;
+            await this.saveRubric(existingRubric);
+          }
+        }
+      }
+      
+      // Use retry mechanism for saving
+      await this.retryOperation(
+        async () => {
+          await fs.promises.writeFile(rubricPath, JSON.stringify(rubric, null, 2));
+          
+          // Verify the file was written
+          if (!fs.existsSync(rubricPath)) {
+            throw new Error(`Rubric file was not created at ${rubricPath}`);
+          }
+          
+          const fileStats = fs.statSync(rubricPath);
+          if (fileStats.size === 0) {
+            throw new Error(`Rubric file was created but is empty`);
+          }
+        },
+        `save rubric ${rubric.id}`
+      );
+      
+      console.log(`FileStorageProvider: Rubric ${rubric.id} saved successfully`);
+    } catch (error) {
+      console.error(`FileStorageProvider: Error saving rubric ${rubric.id}:`, error);
+      throw new Error(`Failed to save rubric: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async getRubric(rubricId: string): Promise<Rubric | null> {
+    this.ensureRubricsDir();
+    const rubricPath = path.join(this.rubricsDir, `${rubricId}.json`);
+    
+    try {
+      if (!fs.existsSync(rubricPath)) {
+        console.log(`File Storage: Rubric file not found: ${rubricPath}`);
+        return null;
+      }
+      
+      console.log(`File Storage: Reading rubric file: ${rubricPath}`);
+      
+      // Use retry mechanism for reading
+      const rubricData = await this.retryOperation(
+        async () => {
+          const data = await fs.promises.readFile(rubricPath, 'utf8');
+          if (!data || data.trim() === '') {
+            throw new Error(`Rubric file is empty or contains only whitespace`);
+          }
+          return data;
+        },
+        `read rubric ${rubricId}`
+      );
+      
+      let rubric: Rubric;
+      try {
+        rubric = JSON.parse(rubricData) as Rubric;
+      } catch (parseError) {
+        console.error(`File Storage: Error parsing rubric JSON for ${rubricId}:`, parseError);
+        return null;
+      }
+      
+      console.log(`File Storage: Successfully retrieved rubric ${rubricId}`);
+      return rubric;
+    } catch (error) {
+      console.error(`File Storage: Error reading rubric ${rubricId}:`, error);
+      return null;
+    }
+  }
+
+  async listRubrics(): Promise<Rubric[]> {
+    this.ensureRubricsDir();
+    
+    try {
+      console.log(`File Storage: Listing all rubrics in ${this.rubricsDir}`);
+      const files = await fs.promises.readdir(this.rubricsDir);
+      const rubrics: Rubric[] = [];
+      
+      for (const file of files) {
+        if (file.endsWith('.json')) {
+          const rubricId = file.replace('.json', '');
+          try {
+            const rubric = await this.getRubric(rubricId);
+            if (rubric) {
+              rubrics.push(rubric);
+            }
+          } catch (error) {
+            console.error(`File Storage: Error processing rubric file ${file}:`, error);
+            // Continue with other files even if one fails
+          }
+        }
+      }
+      
+      console.log(`File Storage: Found ${rubrics.length} rubrics`);
+      return rubrics;
+    } catch (error) {
+      console.error('File Storage: Error listing rubrics:', error);
+      return [];
+    }
+  }
+
+  async deleteRubric(rubricId: string): Promise<boolean> {
+    this.ensureRubricsDir();
+    const rubricPath = path.join(this.rubricsDir, `${rubricId}.json`);
+    
+    try {
+      // First check if this rubric exists and if it's the default
+      const rubric = await this.getRubric(rubricId);
+      if (!rubric) {
+        console.log(`File Storage: Rubric ${rubricId} not found for deletion`);
+        return false;
+      }
+      
+      // Handle default rubric deletion
+      if (rubric.isDefault) {
+        // Find another rubric to set as default
+        const allRubrics = await this.listRubrics();
+        const otherRubrics = allRubrics.filter(r => r.id !== rubricId);
+        
+        if (otherRubrics.length > 0) {
+          // Set the first one as default
+          otherRubrics[0].isDefault = true;
+          await this.saveRubric(otherRubrics[0]);
+        }
+      }
+      
+      // Now delete the rubric
+      if (!fs.existsSync(rubricPath)) {
+        console.log(`File Storage: Rubric file not found for deletion: ${rubricPath}`);
+        return false;
+      }
+      
+      console.log(`File Storage: Deleting rubric file: ${rubricPath}`);
+      
+      // Use retry mechanism for deletion
+      await this.retryOperation(
+        async () => {
+          await fs.promises.unlink(rubricPath);
+          
+          // Verify the file was deleted
+          if (fs.existsSync(rubricPath)) {
+            throw new Error(`Rubric file still exists after deletion attempt`);
+          }
+        },
+        `delete rubric ${rubricId}`
+      );
+      
+      console.log(`File Storage: Rubric ${rubricId} deleted successfully`);
+      return true;
+    } catch (error) {
+      console.error(`File Storage: Error deleting rubric ${rubricId}:`, error);
+      return false;
+    }
+  }
+
+  async getDefaultRubric(): Promise<Rubric | null> {
+    console.log('File Storage: Retrieving default rubric');
+    
+    try {
+      const rubrics = await this.listRubrics();
+      const defaultRubric = rubrics.find(r => r.isDefault);
+      
+      if (defaultRubric) {
+        console.log(`File Storage: Found default rubric ${defaultRubric.id}`);
+        return defaultRubric;
+      } else if (rubrics.length > 0) {
+        // If no rubric is marked as default but there are rubrics, set the first one as default
+        console.log(`File Storage: No default rubric found, setting ${rubrics[0].id} as default`);
+        rubrics[0].isDefault = true;
+        await this.saveRubric(rubrics[0]);
+        return rubrics[0];
+      } else {
+        console.log('File Storage: No rubrics found');
+        return null;
+      }
+    } catch (error) {
+      console.error('File Storage: Error getting default rubric:', error);
+      return null;
+    }
+  }
+
+  async setDefaultRubric(rubricId: string): Promise<boolean> {
+    console.log(`File Storage: Setting default rubric to ${rubricId}`);
+    
+    try {
+      // Check if the rubric exists
+      const rubric = await this.getRubric(rubricId);
+      if (!rubric) {
+        console.log(`File Storage: Rubric ${rubricId} not found, cannot set as default`);
+        return false;
+      }
+      
+      // Get all rubrics and update their isDefault flag
+      const rubrics = await this.listRubrics();
+      for (const r of rubrics) {
+        if (r.id === rubricId) {
+          if (!r.isDefault) {
+            r.isDefault = true;
+            await this.saveRubric(r);
+          }
+        } else if (r.isDefault) {
+          r.isDefault = false;
+          await this.saveRubric(r);
+        }
+      }
+      
+      console.log(`File Storage: Rubric ${rubricId} set as default successfully`);
+      return true;
+    } catch (error) {
+      console.error(`File Storage: Error setting default rubric ${rubricId}:`, error);
+      return false;
+    }
+  }
 }
 
 // Factory function to get the appropriate storage provider
@@ -497,4 +871,40 @@ export function createJob(markdown?: string, fileName?: string): JobStatus {
     createdAt: Date.now().toString(),
     updatedAt: Date.now().toString()
   };
+}
+
+// Add this function to initialize the rubric system
+export async function initializeRubricSystem(): Promise<void> {
+  try {
+    console.log('Storage Provider: Initializing rubric system');
+    const storage = getStorageProvider();
+    
+    // Check if any rubrics exist
+    const rubrics = await storage.listRubrics();
+    
+    if (rubrics.length === 0) {
+      console.log('Storage Provider: No rubrics found, creating default wine sales rubric');
+      
+      // Import the createDefaultWineSalesRubric function
+      const { createDefaultWineSalesRubric } = require('../types/rubric');
+      
+      // Create and save default rubric
+      const defaultRubric = createDefaultWineSalesRubric();
+      await storage.saveRubric(defaultRubric);
+      
+      console.log('Storage Provider: Default wine sales rubric created successfully');
+    } else {
+      console.log(`Storage Provider: Found ${rubrics.length} existing rubrics`);
+      
+      // Ensure there's a default rubric
+      const defaultRubric = rubrics.find(r => r.isDefault);
+      if (!defaultRubric) {
+        console.log('Storage Provider: No default rubric set, setting the first one as default');
+        await storage.setDefaultRubric(rubrics[0].id);
+      }
+    }
+  } catch (error) {
+    console.error('Storage Provider: Error initializing rubric system:', error);
+    throw new Error(`Failed to initialize rubric system: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
 } 

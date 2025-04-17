@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  swcMinify: true,
   output: 'standalone',
   images: {
     unoptimized: true,
@@ -14,22 +15,14 @@ const nextConfig = {
   // Ensure all dependencies are properly handled
   transpilePackages: ['@react-pdf/renderer', 'recharts'],
   
-  // Configure webpack for CSS and PDF handling
+  // Configure webpack for PDF handling
   webpack: (config, { isServer }) => {
-    // Add specific configuration for @react-pdf/renderer
     if (!isServer) {
       config.resolve.fallback = {
         ...config.resolve.fallback,
-        canvas: false,
+        fs: false,
       };
     }
-    
-    // Ensure CSS is properly processed
-    config.module.rules.push({
-      test: /\.css$/,
-      use: ['style-loader', 'css-loader', 'postcss-loader'],
-    });
-    
     return config;
   },
   
@@ -50,12 +43,7 @@ const nextConfig = {
   publicRuntimeConfig: {
     NODE_ENV: process.env.NODE_ENV || 'development',
     IS_RENDER: process.env.RENDER === 'true',
-  },
-  
-  // Ensure proper experimental features for standalone output
-  experimental: {
-    // Any experimental features needed for standalone mode
-  },
+  }
 };
 
 module.exports = nextConfig; 

@@ -1,10 +1,9 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: [
-    './app/**/*.{js,ts,jsx,tsx,mdx}',
     './pages/**/*.{js,ts,jsx,tsx,mdx}',
     './components/**/*.{js,ts,jsx,tsx,mdx}',
-    './netlify/functions/**/*.{js,ts,jsx,tsx,mdx}',
+    './app/**/*.{js,ts,jsx,tsx,mdx}',
   ],
   theme: {
     extend: {
@@ -21,6 +20,21 @@ module.exports = {
           800: '#5b21b6',
           900: '#4c1d95',
         },
+        emerald: {
+          600: '#059669',
+        },
+        green: {
+          600: '#16a34a',
+        },
+        yellow: {
+          600: '#ca8a04',
+        },
+        orange: {
+          600: '#ea580c',
+        },
+        red: {
+          600: '#dc2626',
+        },
       },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
@@ -34,6 +48,17 @@ module.exports = {
   future: {
     hoverOnlyWhenSupported: true,
   },
-  // Add safelist for any dynamically generated classes
-  safelist: [],
+  // Add safelist for dynamically generated color classes
+  safelist: [
+    'bg-emerald-600',
+    'bg-green-600',
+    'bg-yellow-600',
+    'bg-orange-600',
+    'bg-red-600',
+    'text-emerald-600',
+    'text-green-600',
+    'text-yellow-600',
+    'text-orange-600',
+    'text-red-600'
+  ],
 }; 
