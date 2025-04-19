@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Define environment variables
-STORAGE_DIR=${RENDER_STORAGE_DIR:-/var/data/storage}
+STORAGE_DIR=${RENDER_STORAGE_DIR:-/opt/render/project/src/.render/storage}
 JOBS_DIR=${STORAGE_DIR}/jobs
 PDFS_DIR=${STORAGE_DIR}/pdfs
 RUBRICS_DIR=${STORAGE_DIR}/rubrics
@@ -75,11 +75,18 @@ else
   echo "Rubrics directory already exists"
 fi
 
-# Set permissions
+# Set permissions recursively
 echo "Setting permissions on $STORAGE_DIR"
-chmod -R 755 "$STORAGE_DIR"
+chmod -R 777 "$STORAGE_DIR"
 if [ $? -ne 0 ]; then
   echo "WARNING: Failed to set permissions on $STORAGE_DIR"
+  echo "Trying alternative permissions..."
+  chmod -R 755 "$STORAGE_DIR"
+  if [ $? -ne 0 ]; then
+    echo "ERROR: Failed to set alternative permissions on $STORAGE_DIR"
+  else
+    echo "Alternative permissions set successfully"
+  fi
 else
   echo "Permissions set successfully"
 fi
