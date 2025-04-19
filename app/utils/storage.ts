@@ -237,38 +237,57 @@ export class FileStorageProvider implements StorageProvider {
 
   private ensureJobsDir(): void {
     try {
-      console.log(`FileStorageProvider: Checking if jobs directory exists: ${this.jobsDir}`);
+      // Check if directory exists
       if (!fs.existsSync(this.jobsDir)) {
-        console.log(`FileStorageProvider: Creating jobs directory: ${this.jobsDir}`);
-        fs.mkdirSync(this.jobsDir, { recursive: true });
-        console.log(`FileStorageProvider: Jobs directory created successfully`);
-      } else {
-        console.log(`FileStorageProvider: Jobs directory already exists`);
-        // Log directory contents for debugging
-        const files = fs.readdirSync(this.jobsDir);
-        console.log(`FileStorageProvider: Directory contains ${files.length} files:`, files);
+        console.log(`File Storage: Creating jobs directory at ${this.jobsDir}`);
+        fs.mkdirSync(this.jobsDir, { recursive: true, mode: 0o755 });
       }
+
+      // Verify directory permissions
+      const stats = fs.statSync(this.jobsDir);
+      const canWrite = stats.mode & fs.constants.W_OK;
+      if (!canWrite) {
+        console.error(`File Storage: No write permission for jobs directory ${this.jobsDir}`);
+        throw new Error(`No write permission for jobs directory ${this.jobsDir}`);
+      }
+
+      // Test write access with a temporary file
+      const testFile = path.join(this.jobsDir, '.write-test');
+      fs.writeFileSync(testFile, 'test', { mode: 0o644 });
+      fs.unlinkSync(testFile);
+
+      console.log(`File Storage: Jobs directory ${this.jobsDir} is ready`);
     } catch (error) {
-      console.error(`FileStorageProvider: Error creating jobs directory: ${this.jobsDir}`, error);
-      throw new Error(`Failed to create jobs directory: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error(`File Storage: Failed to ensure jobs directory ${this.jobsDir}:`, error);
+      throw new Error(`Failed to ensure jobs directory: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
   private ensureRubricsDir(): void {
     try {
-      console.log(`FileStorageProvider: Checking if rubrics directory exists: ${this.rubricsDir}`);
+      // Check if directory exists
       if (!fs.existsSync(this.rubricsDir)) {
-        console.log(`FileStorageProvider: Creating rubrics directory: ${this.rubricsDir}`);
-        fs.mkdirSync(this.rubricsDir, { recursive: true });
-        console.log(`FileStorageProvider: Rubrics directory created successfully`);
-      } else {
-        console.log(`FileStorageProvider: Rubrics directory already exists`);
-        const files = fs.readdirSync(this.rubricsDir);
-        console.log(`FileStorageProvider: Directory contains ${files.length} files:`, files);
+        console.log(`File Storage: Creating rubrics directory at ${this.rubricsDir}`);
+        fs.mkdirSync(this.rubricsDir, { recursive: true, mode: 0o755 });
       }
+
+      // Verify directory permissions
+      const stats = fs.statSync(this.rubricsDir);
+      const canWrite = stats.mode & fs.constants.W_OK;
+      if (!canWrite) {
+        console.error(`File Storage: No write permission for rubrics directory ${this.rubricsDir}`);
+        throw new Error(`No write permission for rubrics directory ${this.rubricsDir}`);
+      }
+
+      // Test write access with a temporary file
+      const testFile = path.join(this.rubricsDir, '.write-test');
+      fs.writeFileSync(testFile, 'test', { mode: 0o644 });
+      fs.unlinkSync(testFile);
+
+      console.log(`File Storage: Rubrics directory ${this.rubricsDir} is ready`);
     } catch (error) {
-      console.error(`FileStorageProvider: Error creating rubrics directory: ${this.rubricsDir}`, error);
-      throw new Error(`Failed to create rubrics directory: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error(`File Storage: Failed to ensure rubrics directory ${this.rubricsDir}:`, error);
+      throw new Error(`Failed to ensure rubrics directory: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -340,6 +359,37 @@ export class FileStorageProvider implements StorageProvider {
     throw lastError || new Error(`Failed to ${operationName} after ${this.retryAttempts} attempts`);
   }
 
+  private sanitizeJobId(jobId: string): string {
+    // Remove any potentially unsafe characters from the job ID
+    return jobId.replace(/[^a-zA-Z0-9_-]/g, '_');
+  }
+
+  private getJobPath(jobId: string): string {
+    const safeJobId = this.sanitizeJobId(jobId);
+    return path.join(this.jobsDir, `${safeJobId}.json`);
+  }
+
+  private async atomicWrite(filePath: string, data: string): Promise<void> {
+    const tempPath = `${filePath}.tmp`;
+    try {
+      // Write to temporary file first
+      await fs.promises.writeFile(tempPath, data, { mode: 0o644 });
+      
+      // Rename is atomic on most filesystems
+      await fs.promises.rename(tempPath, filePath);
+    } catch (error) {
+      // Clean up temp file if it exists
+      try {
+        if (fs.existsSync(tempPath)) {
+          await fs.promises.unlink(tempPath);
+        }
+      } catch (cleanupError) {
+        console.error(`File Storage: Error cleaning up temp file ${tempPath}:`, cleanupError);
+      }
+      throw error;
+    }
+  }
+
   async saveJob(job: JobStatus): Promise<void> {
     this.ensureJobsDir();
     
@@ -348,17 +398,17 @@ export class FileStorageProvider implements StorageProvider {
       job.expiresAt = Date.now() + this.maxAge;
     }
     
-    // Use the job ID as the filename, regardless of format
-    const jobPath = path.join(this.jobsDir, `${job.id}.json`);
+    // Use sanitized job ID for the file path
+    const jobPath = this.getJobPath(job.id);
     
     try {
-      console.log(`FileStorageProvider: Saving job ${job.id} to ${jobPath}`);
-      console.log(`FileStorageProvider: Job data:`, JSON.stringify(job, null, 2));
+      console.log(`File Storage: Saving job ${job.id} to ${jobPath}`);
+      console.log(`File Storage: Job data:`, JSON.stringify(job, null, 2));
       
-      // Use retry mechanism for saving
+      // Use retry mechanism for saving with atomic write
       await this.retryOperation(
         async () => {
-          await fs.promises.writeFile(jobPath, JSON.stringify(job, null, 2));
+          await this.atomicWrite(jobPath, JSON.stringify(job, null, 2));
           
           // Verify the file was written
           if (!fs.existsSync(jobPath)) {
@@ -370,7 +420,7 @@ export class FileStorageProvider implements StorageProvider {
             throw new Error(`Job file was created but is empty`);
           }
           
-          console.log(`FileStorageProvider: Job file verification:`, {
+          console.log(`File Storage: Job file verification:`, {
             exists: true,
             size: fileStats.size,
             created: fileStats.birthtime,
@@ -380,9 +430,9 @@ export class FileStorageProvider implements StorageProvider {
         `save job ${job.id}`
       );
       
-      console.log(`FileStorageProvider: Job ${job.id} saved successfully`);
+      console.log(`File Storage: Job ${job.id} saved successfully`);
     } catch (error) {
-      console.error(`FileStorageProvider: Error saving job ${job.id}:`, error);
+      console.error(`File Storage: Error saving job ${job.id}:`, error);
       throw new Error(`Failed to save job: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -390,8 +440,8 @@ export class FileStorageProvider implements StorageProvider {
   async getJob(jobId: string): Promise<JobStatus | null> {
     this.ensureJobsDir();
     
-    // Handle both formats: job_timestamp_random and just the ID
-    const jobPath = path.join(this.jobsDir, `${jobId}.json`);
+    // Use sanitized job ID for the file path
+    const jobPath = this.getJobPath(jobId);
     
     try {
       if (!fs.existsSync(jobPath)) {

@@ -192,10 +192,38 @@ const MarkdownImporter: FC<MarkdownImporterProps> = ({ onAnalysisComplete, isAna
       const data = await response.json();
       console.log('Analysis response:', data);
 
-      // Start polling for job status
+      // Check if this is a direct evaluation
+      if (data.direct) {
+        console.log('Received direct evaluation result');
+        if (!data.result) {
+          throw new Error('No result returned from direct evaluation');
+        }
+
+        const validationResult = validateEvaluationData(data.result);
+        if (!validationResult.isValid) {
+          console.warn('Validation issues found:', validationResult.errors);
+          toast.error('The evaluation data has some issues, but we\'ll try to use it anyway');
+        }
+
+        onAnalysisComplete(validationResult.data, markdown, fileName);
+        toast.success('Conversation analyzed successfully!');
+
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+        setMarkdown(null);
+        setFileName('');
+        setJobId(null);
+        setIsAnalyzing(false);
+        return;
+      }
+
+      // For job-based evaluation, start polling
       let retries = 0;
       const maxRetries = 20;
-      const pollInterval = 3000; // 3 seconds
+      const pollInterval = 3000;
+      let completed = false;
+      const startTime = Date.now();
 
       const pollJobStatus = async () => {
         try {
@@ -211,8 +239,23 @@ const MarkdownImporter: FC<MarkdownImporterProps> = ({ onAnalysisComplete, isAna
 
           if (statusData.status === 'completed') {
             console.log('Job completed successfully');
-            if (statusData.results) {
-              onAnalysisComplete(statusData.results, markdown, fileName);
+            completed = true;
+            if (statusData.result) {
+              const validationResult = validateEvaluationData(statusData.result);
+              if (!validationResult.isValid) {
+                console.warn('Validation issues found:', validationResult.errors);
+                toast.error('The evaluation data has some issues, but we\'ll try to use it anyway');
+              }
+              onAnalysisComplete(validationResult.data, markdown, fileName);
+              toast.success('Conversation analyzed successfully!');
+
+              if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+              }
+              setMarkdown(null);
+              setFileName('');
+              setJobId(null);
+              setIsAnalyzing(false);
             } else {
               throw new Error('No results found in completed job');
             }
@@ -231,8 +274,9 @@ const MarkdownImporter: FC<MarkdownImporterProps> = ({ onAnalysisComplete, isAna
         }
       };
 
-      // Start polling
+      // Start polling for job-based evaluation
       pollJobStatus();
+
     } catch (error) {
       console.error('Error analyzing conversation:', error);
       setError(error instanceof Error ? error.message : 'An error occurred');

@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getStorageProvider } from '@/app/utils/storage';
+import { EdgeStorageProvider } from '@/app/utils/edge-storage';
+
+export const runtime = 'edge';
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -14,7 +17,7 @@ export async function GET(request: NextRequest) {
   console.log('Render environment:', process.env.RENDER === 'true' ? 'yes' : 'no');
 
   try {
-    const storage = getStorageProvider();
+    const storage = EdgeStorageProvider.getInstance();
     const jobData = await storage.getJob(jobId);
     
     if (!jobData) {

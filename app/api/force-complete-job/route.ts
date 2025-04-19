@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getStorageProvider, JobStatus } from '../../../app/utils/storage';
+import { EdgeStorageProvider, JobStatus } from '@/app/utils/edge-storage';
+
+export const runtime = 'edge';
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,7 +16,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Initialize storage provider
-    const storage = getStorageProvider();
+    const storage = EdgeStorageProvider.getInstance();
     
     // Get the job
     const job = await storage.getJob(jobId);

@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { toast } from 'react-hot-toast';
 import { Rubric } from '../../types/rubric';
 import { RubricApi } from '../../utils/rubric-api';
-import { exportRubricToPDF } from '../../utils/rubricPdfExport';
+import { exportRubricToPDF, exportRubricToJSON } from '../../utils/rubric-export';
 
 interface RubricDetailProps {
   rubricId: string;
@@ -51,12 +51,24 @@ const RubricDetail: React.FC<RubricDetailProps> = ({
     }
   };
   
-  const handleExport = () => {
+  const handleExportPDF = () => {
     if (!rubric) return;
     
     try {
       exportRubricToPDF(rubric);
       toast.success('Rubric exported as PDF');
+    } catch (error) {
+      console.error('Error exporting rubric:', error);
+      toast.error('Failed to export rubric. Please try again.');
+    }
+  };
+  
+  const handleExportJSON = () => {
+    if (!rubric) return;
+    
+    try {
+      exportRubricToJSON(rubric);
+      toast.success('Rubric exported as JSON');
     } catch (error) {
       console.error('Error exporting rubric:', error);
       toast.error('Failed to export rubric. Please try again.');
@@ -139,13 +151,23 @@ const RubricDetail: React.FC<RubricDetailProps> = ({
             )}
             
             <button
-              onClick={handleExport}
+              onClick={handleExportPDF}
               className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center"
             >
               <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
               Export PDF
+            </button>
+            
+            <button
+              onClick={handleExportJSON}
+              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 flex items-center"
+            >
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              Export JSON
             </button>
             
             {onEdit && (

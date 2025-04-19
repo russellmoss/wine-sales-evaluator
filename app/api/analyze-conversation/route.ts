@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { evaluateConversationInChunks } from '../../utils/conversation-chunker';
 import { evaluateWithGemini } from '@/app/utils/gemini-evaluator';
 import { RubricApi } from '@/app/utils/rubric-api';
+import { EdgeStorageProvider, JobStatus, createJob } from '@/app/utils/edge-storage';
 
 export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
@@ -52,8 +53,15 @@ export async function POST(request: NextRequest) {
     const fileNameToUse = fileName || `conversation-${Date.now()}.md`;
     console.log(`API: Using file name: ${fileNameToUse}`);
     
-    // If direct evaluation is requested, evaluate directly without storing in file system
-    if (directEvaluation) {
+    // Determine if we should use direct evaluation
+    const shouldUseDirectEvaluation = directEvaluation || 
+                                    model === 'claude' || 
+                                    (contentToAnalyze.length <= 50000);
+
+    console.log(`API: Using ${shouldUseDirectEvaluation ? 'direct' : 'job-based'} evaluation`);
+
+    // If direct evaluation is determined, evaluate directly without storing in file system
+    if (shouldUseDirectEvaluation) {
       console.log('API: Performing direct evaluation...');
       
       if (model === 'gemini') {
@@ -96,7 +104,8 @@ export async function POST(request: NextRequest) {
           const response = {
             result,
             model: 'claude',
-            direct: true // Add flag to indicate this is a direct evaluation
+            direct: true, // Add flag to indicate this is a direct evaluation
+            message: 'Evaluation completed successfully using Claude'
           };
           
           console.log('API: Returning direct Claude response with keys:', Object.keys(response));
@@ -111,19 +120,15 @@ export async function POST(request: NextRequest) {
       }
     }
     
-    // Check if we have a markdown field (for backward compatibility)
-    if (markdown) {
-      console.log('API: Using markdown field for conversation');
-    }
-    
+    // For non-direct evaluation (job-based), create a job and store it
+    console.log('API: Creating job for evaluation...');
+
     // Create a conversation object from the content
     const conversationObj = { 
       conversation: contentToAnalyze, 
       staffName: 'Staff Member', 
       date: new Date().toISOString().split('T')[0] 
     };
-    
-    console.log(`API: Analyzing conversation with model: ${model || 'claude'}`);
     
     if (!conversationObj.conversation) {
       console.error('API: Missing conversation in request body');
@@ -133,83 +138,42 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    console.log(`API: Conversation length: ${conversationObj.conversation.length} characters`);
-    
     // Set default values for optional parameters
     const staffNameToUse = conversationObj.staffName || 'Staff Member';
     const dateToUse = conversationObj.date || new Date().toISOString().split('T')[0];
     const modelToUse = model?.toLowerCase() || 'claude';
     
-    console.log(`API: Using staffName: ${staffNameToUse}`);
-    console.log(`API: Using date: ${dateToUse}`);
-    console.log(`API: Using model: ${modelToUse}`);
-    
-    // Check if we have the required API keys
-    if (modelToUse === 'gemini') {
-      if (!process.env.GEMINI_API_KEY) {
-        console.error('API: GEMINI_API_KEY environment variable is not set');
-        return NextResponse.json(
-          { error: 'GEMINI_API_KEY environment variable is not set' },
-          { status: 500 }
-        );
-      }
+    // Create and store the job using EdgeStorageProvider
+    const storage = EdgeStorageProvider.getInstance();
+    const jobId = body.jobId || `job_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+
+    const job: JobStatus = {
+      id: jobId,
+      status: 'pending' as const,
+      markdown: contentToAnalyze,
+      fileName: fileNameToUse,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      rubricId,
+      expiresAt: Date.now() + 24 * 60 * 60 * 1000 // 24 hours from now
+    };
+
+    try {
+      await storage.saveJob(job);
+      console.log('API: Job created successfully:', jobId);
       
-      // Skip the validation step and just log that we're using the API key
-      console.log('API: Using Gemini API key for evaluation');
-    } else if (modelToUse === 'claude') {
-      if (!process.env.CLAUDE_API_KEY) {
-        console.error('API: CLAUDE_API_KEY environment variable is not set');
-        return NextResponse.json(
-          { error: 'CLAUDE_API_KEY environment variable is not set' },
-          { status: 500 }
-        );
-      }
-    } else {
-      console.error('API: Invalid model selected:', modelToUse);
+      return NextResponse.json({
+        jobId,
+        status: 'pending',
+        message: `Job created successfully. Model: ${modelToUse}`
+      });
+    } catch (error) {
+      console.error('API: Error creating job:', error);
       return NextResponse.json(
-        { error: 'Invalid model selected. Must be either "claude" or "gemini".' },
-        { status: 400 }
+        { error: 'Failed to create job' },
+        { status: 500 }
       );
     }
-    
-    let evaluation;
-    
-    if (modelToUse === 'gemini') {
-      console.log('API: Using Gemini model for evaluation');
-      try {
-        evaluation = await evaluateWithGemini(conversationObj.conversation, rubricId);
-        console.log('API: Gemini evaluation completed successfully');
-      } catch (error) {
-        console.error('API: Error evaluating with Gemini:', error);
-        return NextResponse.json(
-          { error: error instanceof Error ? error.message : 'Error evaluating with Gemini' },
-          { status: 500 }
-        );
-      }
-    } else {
-      console.log('API: Using Claude model for evaluation');
-      try {
-        evaluation = await evaluateConversationInChunks(conversationObj.conversation, staffNameToUse, dateToUse, rubricId);
-        console.log('API: Claude evaluation completed successfully');
-      } catch (error) {
-        console.error('API: Error evaluating with Claude:', error);
-        return NextResponse.json(
-          { error: error instanceof Error ? error.message : 'Error evaluating with Claude' },
-          { status: 500 }
-        );
-      }
-    }
-    
-    console.log('API: Returning evaluation result');
-    // Always return a consistent response format
-    return NextResponse.json({
-      jobId: 'direct-' + Date.now(), // Generate a unique ID for direct evaluation
-      result: {
-        ...evaluation,
-        model: modelToUse // Include the model used in the response
-      },
-      message: `Evaluation completed successfully using ${modelToUse}`
-    });
   } catch (error) {
     console.error('API: Unexpected error in analyze-conversation route:', error);
     return NextResponse.json(

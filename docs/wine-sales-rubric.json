@@ -1,0 +1,170 @@
+{
+  "id": "wine-sales-default",
+  "name": "Wine Sales Evaluation - Default",
+  "description": "Standard rubric for evaluating wine tasting room sales interactions.",
+  "isDefault": true,
+  "criteria": [
+    {
+      "id": "initial-greeting",
+      "name": "Initial Greeting and Welcome",
+      "description": "How effectively does the staff member welcome guests and set a positive tone?",
+      "weight": 8,
+      "scoringLevels": [
+        { "score": 1, "description": "No greeting or unwelcoming approach" },
+        { "score": 2, "description": "Basic greeting but minimal warmth" },
+        { "score": 3, "description": "Friendly greeting but lacks personalization" },
+        { "score": 4, "description": "Warm, friendly greeting with good eye contact" },
+        { "score": 5, "description": "Exceptional welcome that makes guests feel valued and excited" }
+      ]
+    },
+    {
+      "id": "building-rapport",
+      "name": "Building Rapport",
+      "description": "How well does the staff member connect personally with the guests?",
+      "weight": 10,
+      "scoringLevels": [
+        { "score": 1, "description": "No attempt to connect personally with guests" },
+        { "score": 2, "description": "Minimal small talk, mostly transactional" },
+        { "score": 3, "description": "Some rapport-building questions but limited follow-up" },
+        { "score": 4, "description": "Good personal connection through meaningful conversation" },
+        { "score": 5, "description": "Excellent rapport building, including origin questions, future plans, and genuine interest" }
+      ]
+    },
+    {
+      "id": "winery-history",
+      "name": "Winery History and Ethos",
+      "description": "How effectively does the staff member communicate the winery's story and values?",
+      "weight": 10,
+      "scoringLevels": [
+        { "score": 1, "description": "No mention of winery history or values" },
+        { "score": 2, "description": "Brief, factual mention of winery background" },
+        { "score": 3, "description": "Adequate explanation of winery history and values" },
+        { "score": 4, "description": "Compelling storytelling about winery history, connecting to wines" },
+        { "score": 5, "description": "Passionate, engaging narrative that brings the winery ethos to life" }
+      ]
+    },
+    {
+      "id": "storytelling",
+      "name": "Storytelling and Analogies",
+      "description": "How well does the staff member use storytelling and analogies to describe wines?",
+      "weight": 10,
+      "scoringLevels": [
+        { "score": 1, "description": "Technical descriptions only, no storytelling or analogies" },
+        { "score": 2, "description": "Minimal storytelling, mostly factual information" },
+        { "score": 3, "description": "Some storytelling elements but lacking rich analogies" },
+        { "score": 4, "description": "Good use of stories and analogies that help guests understand wines" },
+        { "score": 5, "description": "Exceptional storytelling that creates memorable experiences and makes wine accessible" }
+      ]
+    },
+    {
+      "id": "buying-signals",
+      "name": "Recognition of Buying Signals",
+      "description": "How well does the staff member notice and respond to buying signals?",
+      "weight": 12,
+      "scoringLevels": [
+        { "score": 1, "description": "Misses obvious buying signals completely" },
+        { "score": 2, "description": "Notices some signals but response is delayed or inappropriate" },
+        { "score": 3, "description": "Recognizes main buying signals with adequate response" },
+        { "score": 4, "description": "Quickly identifies buying signals and responds effectively" },
+        { "score": 5, "description": "Expertly recognizes subtle cues and capitalizes on buying moments" }
+      ]
+    },
+    {
+      "id": "data-capture",
+      "name": "Customer Data Capture",
+      "description": "How effectively does the staff member attempt to collect customer information?",
+      "weight": 8,
+      "scoringLevels": [
+        { "score": 1, "description": "No attempt to capture customer data" },
+        { "score": 2, "description": "Single basic attempt at data collection" },
+        { "score": 3, "description": "Multiple attempts but without explaining benefits" },
+        { "score": 4, "description": "Good data capture attempts with clear value proposition" },
+        { "score": 5, "description": "Natural, non-intrusive data collection that feels beneficial to guest" }
+      ]
+    },
+    {
+      "id": "asking-for-sale",
+      "name": "Asking for the Sale",
+      "description": "How effectively does the staff member ask for wine purchases?",
+      "weight": 12,
+      "scoringLevels": [
+        { "score": 1, "description": "Never asks for sale or suggests purchase" },
+        { "score": 2, "description": "Vague suggestion about purchasing without direct ask" },
+        { "score": 3, "description": "Basic closing attempt but lacks confidence" },
+        { "score": 4, "description": "Clear, confident ask for purchase at appropriate time" },
+        { "score": 5, "description": "Multiple strategic closing attempts that feel natural and appropriate" }
+      ]
+    },
+    {
+      "id": "wine-recommendations",
+      "name": "Personalized Wine Recommendations",
+      "description": "How well does the staff member customize wine recommendations based on guest preferences?",
+      "weight": 10,
+      "scoringLevels": [
+        { "score": 1, "description": "Generic recommendations unrelated to expressed interests" },
+        { "score": 2, "description": "Basic recommendations with minimal personalization" },
+        { "score": 3, "description": "Adequate recommendations based on general preferences" },
+        { "score": 4, "description": "Well-tailored recommendations based on specific guest feedback" },
+        { "score": 5, "description": "Expertly customized selections that perfectly match expressed interests" }
+      ]
+    },
+    {
+      "id": "wine-club",
+      "name": "Wine Club Presentation",
+      "description": "How effectively does the staff member present and invite guests to join the wine club?",
+      "weight": 8,
+      "scoringLevels": [
+        { "score": 1, "description": "No mention of wine club or inadequate response when asked" },
+        { "score": 2, "description": "Basic wine club information without personalization" },
+        { "score": 3, "description": "Adequate explanation of benefits but minimal customization" },
+        { "score": 4, "description": "Good presentation of wine club with benefits tailored to guest interests" },
+        { "score": 5, "description": "Compelling, personalized wine club presentation with clear invitation to join" }
+      ]
+    },
+    {
+      "id": "closing-interaction",
+      "name": "Closing Interaction",
+      "description": "How well does the staff member conclude the interaction and encourage future visits?",
+      "weight": 12,
+      "scoringLevels": [
+        { "score": 1, "description": "Abrupt ending with no thanks or future invitation" },
+        { "score": 2, "description": "Basic thank you but no encouragement to return" },
+        { "score": 3, "description": "Polite conclusion with general invitation to return" },
+        { "score": 4, "description": "Warm thank you with specific suggestion for future visit" },
+        { "score": 5, "description": "Memorable farewell that reinforces relationship and ensures future visits" }
+      ]
+    }
+  ],
+  "performanceLevels": [
+    {
+      "name": "Outstanding",
+      "minScore": 90,
+      "maxScore": 100,
+      "description": "Exceptional sales interaction that maximizes guest experience and sales potential"
+    },
+    {
+      "name": "Excellent",
+      "minScore": 80,
+      "maxScore": 90,
+      "description": "Very effective sales approach with strong guest connections and selling skills"
+    },
+    {
+      "name": "Proficient",
+      "minScore": 70,
+      "maxScore": 80,
+      "description": "Competent sales interaction with good basic skills but room for improvement"
+    },
+    {
+      "name": "Developing",
+      "minScore": 60,
+      "maxScore": 70,
+      "description": "Basic sales skills present but requiring significant development"
+    },
+    {
+      "name": "Needs Improvement",
+      "minScore": 0,
+      "maxScore": 60,
+      "description": "Insufficient sales approach requiring extensive training and coaching"
+    }
+  ]
+}

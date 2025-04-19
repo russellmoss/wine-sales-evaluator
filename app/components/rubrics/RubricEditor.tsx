@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { Rubric, Criterion, PerformanceLevel } from '@/app/types/rubric';
 import { RubricApi } from '@/app/utils/rubric-api';
 import ConfirmationDialog from '../ConfirmationDialog';
+import RubricJsonUploader from './RubricJsonUploader';
 
 interface RubricEditorProps {
   rubricId?: string;
@@ -203,6 +204,10 @@ export default function RubricEditor({ rubricId, onSave, onCancel }: RubricEdito
     });
   };
 
+  const handleRubricLoaded = (loadedRubric: Rubric) => {
+    setFormData(loadedRubric);
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center p-8">
@@ -216,6 +221,13 @@ export default function RubricEditor({ rubricId, onSave, onCancel }: RubricEdito
       {error && (
         <div className="p-4 bg-red-50 text-red-700 rounded-lg">
           {error}
+        </div>
+      )}
+
+      {!isEditing && (
+        <div className="mb-6">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Import Rubric from JSON</h3>
+          <RubricJsonUploader onRubricLoaded={handleRubricLoaded} />
         </div>
       )}
 
