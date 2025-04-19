@@ -26,6 +26,8 @@ const MarkdownImporter: FC<MarkdownImporterProps> = ({ onAnalysisComplete, isAna
   const [selectedRubricId, setSelectedRubricId] = useState<string>('');
   const [loadingRubrics, setLoadingRubrics] = useState<boolean>(false);
   
+  const [_message, setMessage] = useState<string>('');
+  
   useEffect(() => {
     console.log('MarkdownImporter: Component mounted, loading rubrics...');
     const loadRubrics = async () => {

@@ -224,9 +224,7 @@ class FileStorageProviderImpl implements StorageProvider {
   private readonly retryAttempts: number;
   private readonly retryDelay: number;
 
-  constructor() {
-    // Use RENDER_STORAGE_DIR if available, otherwise fall back to local storage
-    const baseDir = process.env.RENDER_STORAGE_DIR || path.join(process.cwd(), '.storage');
+  constructor(baseDir: string) {
     this.jobsDir = path.join(baseDir, 'jobs');
     this.pdfsDir = path.join(baseDir, 'pdfs');
     this.rubricsDir = path.join(baseDir, 'rubrics');
@@ -235,72 +233,31 @@ class FileStorageProviderImpl implements StorageProvider {
     this.retryDelay = 1000;
 
     // Ensure directories exist
-    this.ensureJobsDir();
-    this.ensurePdfsDir();
-    this.ensureRubricsDir();
+    this.ensureDirectories();
   }
 
-  private ensureJobsDir() {
-    if (!fs.existsSync(this.jobsDir)) {
-      try {
-        fs.mkdirSync(this.jobsDir, { recursive: true });
-        // Try to set permissions after creation
-        try {
-          fs.chmodSync(this.jobsDir, 0o777);
-        } catch (chmodError) {
-          console.warn('Warning: Could not set permissions on jobs directory:', chmodError);
-        }
-      } catch (error: any) {
-        console.error('Error creating jobs directory:', error);
-        throw new Error(`Failed to create jobs directory: ${error.message}`);
-      }
-    }
+  private ensureDirectories() {
+    const directories = [
+      { path: this.jobsDir, name: 'jobs' },
+      { path: this.pdfsDir, name: 'pdfs' },
+      { path: this.rubricsDir, name: 'rubrics' }
+    ];
 
-    // Verify write permissions
-    try {
-      const testFile = path.join(this.jobsDir, '.test');
-      fs.writeFileSync(testFile, 'test');
-      fs.unlinkSync(testFile);
-    } catch (error: any) {
-      console.error('Error verifying write permissions:', error);
-      // Try to fix permissions
+    for (const dir of directories) {
       try {
-        fs.chmodSync(this.jobsDir, 0o777);
-      } catch (chmodError) {
-        console.error('Error fixing permissions:', chmodError);
-      }
-      throw new Error(`No write permissions for jobs directory: ${error.message}`);
-    }
-  }
-
-  private ensurePdfsDir() {
-    if (!fs.existsSync(this.pdfsDir)) {
-      try {
-        fs.mkdirSync(this.pdfsDir, { recursive: true });
-        try {
-          fs.chmodSync(this.pdfsDir, 0o777);
-        } catch (chmodError) {
-          console.warn('Warning: Could not set permissions on PDFs directory:', chmodError);
+        if (!fs.existsSync(dir.path)) {
+          console.log(`Creating ${dir.name} directory: ${dir.path}`);
+          fs.mkdirSync(dir.path, { recursive: true });
         }
-      } catch (error: any) {
-        console.error('Error creating PDFs directory:', error);
-        throw new Error(`Failed to create PDFs directory: ${error.message}`);
-      }
-    }
-  }
 
-  private ensureRubricsDir() {
-    if (!fs.existsSync(this.rubricsDir)) {
-      try {
-        fs.mkdirSync(this.rubricsDir, { recursive: true });
-        try {
-          fs.chmodSync(this.rubricsDir, 0o777);
-        } catch (chmodError) {
-          console.warn('Warning: Could not set permissions on rubrics directory:', chmodError);
-        }
-      } catch (error: any) {
-        console.error('Error creating rubrics directory:', error);
-        throw new Error(`Failed to create rubrics directory: ${error.message}`);
+        // Test write permissions
+        const testFile = path.join(dir.path, '.test');
+        fs.writeFileSync(testFile, 'test');
+        fs.unlinkSync(testFile);
+        console.log(`${dir.name} directory is writable: ${dir.path}`);
+      } catch (error) {
+        console.error(`Error setting up ${dir.name} directory:`, error);
+        throw new Error(`Failed to set up ${dir.name} directory: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     }
   }
@@ -311,7 +268,7 @@ class FileStorageProviderImpl implements StorageProvider {
    * @returns The raw file content and parsed job data, or null if not found
    */
   async debugJobFile(jobId: string): Promise<{ rawContent: string; parsedJob: JobStatus | null; filePath: string; fileStats: fs.Stats | null } | null> {
-    this.ensureJobsDir();
+    this.ensureDirectories();
     const jobPath = path.join(this.jobsDir, `${jobId}.json`);
     
     try {
@@ -405,7 +362,7 @@ class FileStorageProviderImpl implements StorageProvider {
   }
 
   async saveJob(job: JobStatus): Promise<void> {
-    this.ensureJobsDir();
+    this.ensureDirectories();
     
     // Set expiration time if not already set
     if (!job.expiresAt) {
@@ -452,7 +409,7 @@ class FileStorageProviderImpl implements StorageProvider {
   }
 
   async getJob(jobId: string): Promise<JobStatus | null> {
-    this.ensureJobsDir();
+    this.ensureDirectories();
     
     // Use sanitized job ID for the file path
     const jobPath = this.getJobPath(jobId);
@@ -528,7 +485,7 @@ class FileStorageProviderImpl implements StorageProvider {
   }
 
   async listJobs(): Promise<JobStatus[]> {
-    this.ensureJobsDir();
+    this.ensureDirectories();
     
     try {
       console.log(`File Storage: Listing all jobs in ${this.jobsDir}`);
@@ -559,7 +516,7 @@ class FileStorageProviderImpl implements StorageProvider {
   }
 
   async deleteJob(jobId: string): Promise<boolean> {
-    this.ensureJobsDir();
+    this.ensureDirectories();
     const jobPath = path.join(this.jobsDir, `${jobId}.json`);
     
     try {
@@ -592,7 +549,7 @@ class FileStorageProviderImpl implements StorageProvider {
   }
 
   async cleanupExpiredJobs(): Promise<number> {
-    this.ensureJobsDir();
+    this.ensureDirectories();
     
     try {
       console.log(`File Storage: Cleaning up expired jobs in ${this.jobsDir}`);
@@ -644,7 +601,7 @@ class FileStorageProviderImpl implements StorageProvider {
 
   // Rubric management methods
   async saveRubric(rubric: Rubric): Promise<void> {
-    this.ensureRubricsDir();
+    this.ensureDirectories();
     
     const rubricPath = path.join(this.rubricsDir, `${rubric.id}.json`);
     
@@ -689,7 +646,7 @@ class FileStorageProviderImpl implements StorageProvider {
   }
 
   async getRubric(rubricId: string): Promise<Rubric | null> {
-    this.ensureRubricsDir();
+    this.ensureDirectories();
     const rubricPath = path.join(this.rubricsDir, `${rubricId}.json`);
     
     try {
@@ -729,7 +686,7 @@ class FileStorageProviderImpl implements StorageProvider {
   }
 
   async listRubrics(): Promise<Rubric[]> {
-    this.ensureRubricsDir();
+    this.ensureDirectories();
     
     try {
       console.log(`File Storage: Listing all rubrics in ${this.rubricsDir}`);
@@ -760,7 +717,7 @@ class FileStorageProviderImpl implements StorageProvider {
   }
 
   async deleteRubric(rubricId: string): Promise<boolean> {
-    this.ensureRubricsDir();
+    this.ensureDirectories();
     const rubricPath = path.join(this.rubricsDir, `${rubricId}.json`);
     
     try {
@@ -873,9 +830,6 @@ class FileStorageProviderImpl implements StorageProvider {
   }
 }
 
-// Export a singleton instance
-export const FileStorageProvider = new FileStorageProviderImpl();
-
 // Factory function to get the appropriate storage provider
 export function getStorageProvider(): StorageProvider {
   const storageType = process.env.JOB_STORAGE_TYPE || 'file';
@@ -896,60 +850,58 @@ export function getStorageProvider(): StorageProvider {
   let storageDir;
   if (isRender) {
     // For Render production, use the persistent disk mount path
-    storageDir = process.env.RENDER_STORAGE_DIR || '/opt/render/project/src/.render/jobs';
+    storageDir = process.env.RENDER_STORAGE_DIR || '/opt/render/project/src/.render/storage';
     console.log(`Storage Provider: Using Render persistent storage at ${storageDir}`);
   } else if (process.env.NODE_ENV === 'production') {
     // For other production environments (not Render)
-    storageDir = '/tmp/jobs';
+    storageDir = '/tmp/storage';
     console.log(`Storage Provider: Using production temporary storage at ${storageDir}`);
   } else {
     // For local development
-    storageDir = path.join(process.cwd(), '.render', 'jobs');
+    storageDir = path.join(process.cwd(), '.storage');
     console.log(`Storage Provider: Using local development storage at ${storageDir}`);
   }
 
   // Try different fallback directories if needed
   const fallbackDirs = [
     storageDir,
-    '/tmp/jobs',
-    path.join(process.cwd(), 'jobs'),
-    path.join(process.cwd(), '.jobs'),
-    path.join(process.cwd(), '.render', 'jobs')
+    '/tmp/storage',
+    path.join(process.cwd(), 'storage'),
+    path.join(process.cwd(), '.storage'),
+    path.join(process.cwd(), '.render', 'storage')
   ];
   
   let selectedDir = null;
-  
-  // Find the first directory we can write to
   for (const dir of fallbackDirs) {
     try {
-      console.log(`Storage Provider: Trying directory ${dir}`);
-      
-      // Try to create the directory if it doesn't exist
       if (!fs.existsSync(dir)) {
-        console.log(`Storage Provider: Creating directory ${dir}`);
-        fs.mkdirSync(dir, { recursive: true, mode: 0o755 });
+        fs.mkdirSync(dir, { recursive: true });
       }
-      
-      // Check if we can write to the directory
-      const testFile = path.join(dir, '.write-test');
-      fs.writeFileSync(testFile, 'test', { mode: 0o644 });
+      // Test write permissions
+      const testFile = path.join(dir, '.test');
+      fs.writeFileSync(testFile, 'test');
       fs.unlinkSync(testFile);
-      
-      console.log(`Storage Provider: Successfully using directory ${dir}`);
       selectedDir = dir;
+      console.log(`Storage Provider: Successfully initialized storage at ${dir}`);
       break;
     } catch (error) {
-      console.error(`Storage Provider: Cannot use directory ${dir}:`, error);
+      console.warn(`Storage Provider: Failed to use directory ${dir}:`, error);
     }
   }
-  
+
   if (!selectedDir) {
-    console.error(`Storage Provider: Failed to find a writable directory, using memory storage`);
-    return MemoryStorageProvider.getInstance();
+    console.error('Storage Provider: Failed to find a usable storage directory');
+    throw new Error('No usable storage directory found');
   }
-  
-  console.log(`Storage Provider: Using directory ${selectedDir}`);
-  return new FileStorageProviderImpl();
+
+  // Create the storage provider instance
+  if (storageType === 'memory' || isDev) {
+    console.log('Storage Provider: Using MemoryStorageProvider');
+    return MemoryStorageProvider.getInstance();
+  } else {
+    console.log(`Storage Provider: Using FileStorageProvider with directory ${selectedDir}`);
+    return new FileStorageProviderImpl(selectedDir);
+  }
 }
 
 // Helper function to create a new job
