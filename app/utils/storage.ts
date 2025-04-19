@@ -225,12 +225,12 @@ export class FileStorageProvider implements StorageProvider {
   private retryDelay: number;
 
   constructor(jobsDir: string, maxAge: number) {
-    this.jobsDir = jobsDir;
-    this.rubricsDir = path.join(path.dirname(jobsDir), 'rubrics');
+    this.jobsDir = path.join(jobsDir, 'jobs');
+    this.rubricsDir = path.join(jobsDir, 'rubrics');
     this.maxAge = maxAge;
     this.retryAttempts = 3;
     this.retryDelay = 1000;
-    console.log(`FileStorageProvider: Initializing with jobsDir=${jobsDir}, rubricsDir=${this.rubricsDir}, maxAge=${maxAge}`);
+    console.log(`FileStorageProvider: Initializing with jobsDir=${this.jobsDir}, rubricsDir=${this.rubricsDir}, maxAge=${maxAge}`);
     this.ensureJobsDir();
     this.ensureRubricsDir();
   }
@@ -348,6 +348,7 @@ export class FileStorageProvider implements StorageProvider {
       job.expiresAt = Date.now() + this.maxAge;
     }
     
+    // Use the job ID as the filename, regardless of format
     const jobPath = path.join(this.jobsDir, `${job.id}.json`);
     
     try {
@@ -388,11 +389,31 @@ export class FileStorageProvider implements StorageProvider {
 
   async getJob(jobId: string): Promise<JobStatus | null> {
     this.ensureJobsDir();
+    
+    // Handle both formats: job_timestamp_random and just the ID
     const jobPath = path.join(this.jobsDir, `${jobId}.json`);
     
     try {
       if (!fs.existsSync(jobPath)) {
         console.log(`File Storage: Job file not found: ${jobPath}`);
+        
+        // If the job ID contains a timestamp, try to find it by listing all files
+        if (jobId.includes('_')) {
+          console.log(`File Storage: Job ID contains timestamp, searching all files for match`);
+          const files = await fs.promises.readdir(this.jobsDir);
+          
+          for (const file of files) {
+            if (file.endsWith('.json')) {
+              const fileJobId = file.replace('.json', '');
+              if (fileJobId === jobId) {
+                console.log(`File Storage: Found matching job file: ${file}`);
+                const jobData = await fs.promises.readFile(path.join(this.jobsDir, file), 'utf8');
+                return JSON.parse(jobData) as JobStatus;
+              }
+            }
+          }
+        }
+        
         return null;
       }
       
