@@ -7,14 +7,37 @@ import { getStorageProvider, JobStatus } from '../../app/utils/storage';
 import { validateEvaluationData } from '../../app/utils/validation';
 import { Rubric } from '../../app/types/rubric';
 import type { EvaluationData as AppEvaluationData } from '../../app/types/evaluation';
+import type { JobErrorDetails } from '../../app/types/job';
 
 // Timeout constants in milliseconds
 const TIMEOUTS = {
-  JOB_PROCESSING: 300000, // 5 minutes for entire job processing
-  CLAUDE_API: 120000,     // 2 minutes for Claude API call
-  STORAGE: 30000,         // 30 seconds for storage operations
-  RETRY_DELAY: 1000       // 1 second delay between retries
+  JOB_PROCESSING: 240000,  // 4 minutes for entire job processing
+  CLAUDE_API: 90000,       // 90 seconds for Claude API call
+  STORAGE: 15000,          // 15 seconds for storage operations
+  RETRY_DELAY: 1000,       // 1 second delay between retries
+  MAX_RETRIES: 3           // Maximum number of retries for operations
 };
+
+// Fallback configuration
+const FALLBACK_CONFIG = {
+  ENABLED: true,                  // Enable automatic fallback to direct evaluation
+  MAX_CONVERSATION_LENGTH: 25000, // Maximum conversation length before chunking
+  MAX_PENDING_TIME: 180000,       // 3 minutes max in pending state
+  CHUNK_OVERLAP: 500              // Character overlap when chunking conversations
+};
+
+// Ensure fallback configuration can be controlled via environment variables
+if (process.env.ENABLE_DIRECT_FALLBACK === 'false') {
+  FALLBACK_CONFIG.ENABLED = false;
+}
+
+if (process.env.MAX_CONVERSATION_LENGTH) {
+  FALLBACK_CONFIG.MAX_CONVERSATION_LENGTH = parseInt(process.env.MAX_CONVERSATION_LENGTH, 10);
+}
+
+if (process.env.MAX_PENDING_TIME) {
+  FALLBACK_CONFIG.MAX_PENDING_TIME = parseInt(process.env.MAX_PENDING_TIME, 10);
+}
 
 // Rate limiting configuration
 const RATE_LIMIT = {
@@ -24,7 +47,7 @@ const RATE_LIMIT = {
 };
 
 /**
- * Utility function to wrap a promise with a timeout
+ * Simple utility function to wrap a promise with a timeout
  * @param promise The promise to wrap
  * @param timeoutMs Timeout in milliseconds
  * @param operationName Name of the operation for logging
@@ -32,7 +55,7 @@ const RATE_LIMIT = {
  * @returns The result of the promise
  * @throws Error if the operation times out
  */
-async function withTimeout<T>(
+async function simpleTimeout<T>(
   promise: Promise<T>,
   timeoutMs: number,
   operationName: string,
@@ -45,6 +68,51 @@ async function withTimeout<T>(
   });
 
   return Promise.race([promise, timeoutPromise]);
+}
+
+/**
+ * Enhanced utility function to wrap a promise with a timeout and retry logic
+ * @param promise The promise to wrap
+ * @param timeoutMs Timeout in milliseconds
+ * @param operationName Name of the operation for logging
+ * @param jobId Job ID for logging context
+ * @param retryCount Current retry count
+ * @returns The result of the promise
+ * @throws Error if the operation times out after all retries
+ */
+async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  operationName: string,
+  jobId: string,
+  retryCount = 0
+): Promise<T> {
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    setTimeout(() => {
+      reject(new Error(`${operationName} timed out after ${timeoutMs}ms for job ${jobId}`));
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } catch (error) {
+    // Check if this is a timeout error and we haven't exceeded max retries
+    if (error instanceof Error && 
+        error.message.includes('timed out') && 
+        retryCount < TIMEOUTS.MAX_RETRIES) {
+      
+      console.log(`[${new Date().toISOString()}] Background function: ${operationName} timed out for job ${jobId}, retrying (${retryCount + 1}/${TIMEOUTS.MAX_RETRIES})`);
+      
+      // Wait before retrying
+      await new Promise(resolve => setTimeout(resolve, TIMEOUTS.RETRY_DELAY));
+      
+      // Retry the operation
+      return withTimeout(promise, timeoutMs, operationName, jobId, retryCount + 1);
+    }
+    
+    // If we've exceeded retries or it's not a timeout error, rethrow
+    throw error;
+  }
 }
 
 // Add diagnostic logging
@@ -667,7 +735,8 @@ async function analyzeConversationWithClaude(
   conversation: string,
   staffName: string,
   date: string,
-  rubricId?: string
+  rubricId?: string,
+  jobId?: string
 ): Promise<EvaluationData> {
   console.log('Starting conversation analysis with Claude');
   
@@ -686,10 +755,22 @@ async function analyzeConversationWithClaude(
     }
     
     // First try to load the specified rubric or fall back to default
-    const rubric = await loadRubric(rubricId);
+    const rubric = await withTimeout(
+      loadRubric(rubricId),
+      TIMEOUTS.STORAGE,
+      'Loading rubric',
+      jobId || 'unknown'
+    );
     
     if (!rubric) {
       throw new Error('No rubric found for evaluation');
+    }
+    
+    // Check if conversation is too long and needs chunking
+    let processedConversation = conversation;
+    if (conversation.length > FALLBACK_CONFIG.MAX_CONVERSATION_LENGTH) {
+      console.log(`Conversation length (${conversation.length}) exceeds maximum (${FALLBACK_CONFIG.MAX_CONVERSATION_LENGTH}), truncating`);
+      processedConversation = truncateConversation(conversation, FALLBACK_CONFIG.MAX_CONVERSATION_LENGTH);
     }
     
     // Prepare the prompt with the rubric
@@ -707,7 +788,7 @@ RUBRIC TO USE:
 ${JSON.stringify(rubric, null, 2)}
 
 CONVERSATION TO EVALUATE:
-${conversation}
+${processedConversation}
 
 STAFF MEMBER: ${staffName}
 DATE: ${date}
@@ -737,18 +818,25 @@ Respond with ONLY this JSON format - no other text or explanation:
     await enforceRateLimit();
     
     console.log('Sending request to Claude API with rubric:', rubric.id);
-    const response = await anthropic.messages.create({
-      model: 'claude-3-7-sonnet-20250219',
-      max_tokens: 4000,
-      temperature: 0,
-      system: "You are a wine sales evaluation expert. ONLY respond with valid JSON - no other text or explanation.",
-      messages: [
-        {
-          role: 'user',
-          content: prompt
-        }
-      ]
-    });
+    
+    // Use withTimeout to handle Claude API call timeout
+    const response = await withTimeout(
+      anthropic.messages.create({
+        model: 'claude-3-7-sonnet-20250219',
+        max_tokens: 4000,
+        temperature: 0,
+        system: "You are a wine sales evaluation expert. ONLY respond with valid JSON - no other text or explanation.",
+        messages: [
+          {
+            role: 'user',
+            content: prompt
+          }
+        ]
+      }),
+      TIMEOUTS.CLAUDE_API,
+      'Claude API call',
+      jobId || 'unknown'
+    );
     
     console.log('Received response from Claude API');
     const content = response.content[0];
@@ -890,8 +978,14 @@ export const handler: Handler = async (event: HandlerEvent, context: HandlerCont
       };
     }
     
-    // Get the job from storage
-    const job = await storage.getJob(jobId);
+    // Get the job from storage with timeout
+    const job = await withTimeout(
+      storage.getJob(jobId),
+      TIMEOUTS.STORAGE,
+      'Getting job from storage',
+      jobId
+    );
+    
     if (!job) {
       console.log(`[${new Date().toISOString()}] Background function: Job ${jobId} not found`);
       return {
@@ -900,37 +994,174 @@ export const handler: Handler = async (event: HandlerEvent, context: HandlerCont
       };
     }
     
+    // Check if job has been in pending state too long
+    const jobAge = Date.now() - new Date(job.createdAt).getTime();
+    if (job.status === 'pending' && jobAge > FALLBACK_CONFIG.MAX_PENDING_TIME) {
+      console.log(`[${new Date().toISOString()}] Background function: Job ${jobId} has been pending too long (${jobAge}ms), enabling fallback`);
+      // We'll handle this in the processing section
+    }
+    
     // Update job status to processing
     job.status = 'processing';
     job.updatedAt = new Date().toISOString();
-    await storage.saveJob(job);
+    await withTimeout(
+      storage.saveJob(job),
+      TIMEOUTS.STORAGE,
+      'Updating job status to processing',
+      jobId
+    );
     console.log(`[${new Date().toISOString()}] Background function: Updated job ${jobId} status to processing`);
     
-    // Analyze the conversation with Claude, passing the rubricId
-    const evaluationResult = await analyzeConversationWithClaude(
-      conversation,
-      staffName,
-      date,
-      rubricId || job.rubricId // Use the rubricId from the request or job
-    );
-    
-    // Update job with the evaluation result
-    job.status = 'completed';
-    job.result = evaluationResult;
-    job.updatedAt = new Date().toISOString();
-    await storage.saveJob(job);
-    console.log(`[${new Date().toISOString()}] Background function: Updated job ${jobId} status to completed`);
-    
-    // Return success response
-    return {
-      statusCode: 200,
-      body: JSON.stringify({ 
-        message: 'Job processed successfully',
-        jobId: job.id
-      })
-    };
+    // Wrap the entire job processing in a timeout
+    try {
+      // Analyze the conversation with Claude, passing the rubricId
+      const evaluationResult = await withTimeout(
+        analyzeConversationWithClaude(
+          conversation,
+          staffName,
+          date,
+          rubricId || job.rubricId, // Use the rubricId from the request or job
+          jobId
+        ),
+        TIMEOUTS.JOB_PROCESSING,
+        'Job processing',
+        jobId
+      );
+      
+      // Update job with the evaluation result
+      job.status = 'completed';
+      job.result = {
+        evaluation: evaluationResult,
+        metadata: {
+          processingTime: Date.now() - new Date(job.createdAt).getTime(),
+          modelVersion: 'claude-3-7-sonnet-20250219'
+        }
+      };
+      job.updatedAt = new Date().toISOString();
+      await withTimeout(
+        storage.saveJob(job),
+        TIMEOUTS.STORAGE,
+        'Saving completed job',
+        jobId
+      );
+      console.log(`[${new Date().toISOString()}] Background function: Updated job ${jobId} status to completed`);
+      
+      // Return success response
+      return {
+        statusCode: 200,
+        body: JSON.stringify({ 
+          message: 'Job processed successfully',
+          jobId: job.id
+        })
+      };
+    } catch (processingError) {
+      console.error(`[${new Date().toISOString()}] Background function: Error processing job ${jobId}:`, processingError);
+      
+      // Check if fallback is enabled and the error is a timeout
+      const isTimeoutError = processingError instanceof Error && 
+        (processingError.message.includes('timed out') || 
+         processingError.message.includes('timeout'));
+      
+      if (FALLBACK_CONFIG.ENABLED && isTimeoutError) {
+        console.log(`[${new Date().toISOString()}] Background function: Attempting fallback to direct evaluation for job ${jobId}`);
+        
+        try {
+          // Perform basic evaluation as fallback
+          const fallbackResult = await withTimeout(
+            performBasicEvaluation(conversation),
+            TIMEOUTS.JOB_PROCESSING / 2, // Use half the normal processing time for fallback
+            'Fallback evaluation',
+            jobId
+          );
+          
+          // Update job with the fallback result
+          job.status = 'completed';
+          job.result = {
+            evaluation: fallbackResult,
+            metadata: {
+              processingTime: Date.now() - new Date(job.createdAt).getTime(),
+              modelVersion: 'fallback-evaluation',
+              isFallback: true
+            }
+          };
+          job.updatedAt = new Date().toISOString();
+          await withTimeout(
+            storage.saveJob(job),
+            TIMEOUTS.STORAGE,
+            'Saving fallback job result',
+            jobId
+          );
+          console.log(`[${new Date().toISOString()}] Background function: Updated job ${jobId} status to completed with fallback`);
+          
+          // Return success response with fallback indicator
+          return {
+            statusCode: 200,
+            body: JSON.stringify({ 
+              message: 'Job processed successfully with fallback',
+              jobId: job.id,
+              usedFallback: true
+            })
+          };
+        } catch (fallbackError) {
+          console.error(`[${new Date().toISOString()}] Background function: Fallback evaluation failed for job ${jobId}:`, fallbackError);
+          
+          // Update job with error details
+          job.status = 'failed';
+          job.error = fallbackError instanceof Error ? fallbackError.message : 'Unknown error during fallback';
+          job.errorDetails = {
+            type: fallbackError instanceof Error ? fallbackError.name : 'UnknownError',
+            message: fallbackError instanceof Error ? fallbackError.message : 'Unknown error',
+            timestamp: new Date().toISOString(),
+            isTimeout: true,
+            originalError: processingError instanceof Error ? processingError.message : 'Unknown error'
+          } as JobErrorDetails;
+          job.updatedAt = new Date().toISOString();
+          await withTimeout(
+            storage.saveJob(job),
+            TIMEOUTS.STORAGE,
+            'Saving failed job with fallback error',
+            jobId
+          );
+          
+          return {
+            statusCode: 500,
+            body: JSON.stringify({ 
+              error: 'Job processing failed after fallback attempt',
+              details: fallbackError instanceof Error ? fallbackError.message : 'Unknown error',
+              jobId: job.id
+            })
+          };
+        }
+      } else {
+        // No fallback or not a timeout error, mark job as failed
+        job.status = 'failed';
+        job.error = processingError instanceof Error ? processingError.message : 'Unknown error';
+        job.errorDetails = {
+          type: processingError instanceof Error ? processingError.name : 'UnknownError',
+          message: processingError instanceof Error ? processingError.message : 'Unknown error',
+          timestamp: new Date().toISOString(),
+          isTimeout: isTimeoutError
+        };
+        job.updatedAt = new Date().toISOString();
+        await withTimeout(
+          storage.saveJob(job),
+          TIMEOUTS.STORAGE,
+          'Saving failed job',
+          jobId
+        );
+        
+        return {
+          statusCode: 500,
+          body: JSON.stringify({ 
+            error: 'Job processing failed',
+            details: processingError instanceof Error ? processingError.message : 'Unknown error',
+            jobId: job.id
+          })
+        };
+      }
+    }
   } catch (error: unknown) {
-    console.error(`[${new Date().toISOString()}] Background function: Error processing request:`, error);
+    console.error(`[${new Date().toISOString()}] Background function: Error handling request:`, error);
     
     // If we have a job ID, update the job status to failed
     try {

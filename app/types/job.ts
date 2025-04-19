@@ -12,6 +12,7 @@ export type JobResult = {
     processingTime?: number;
     modelVersion?: string;
     confidence?: number;
+    isFallback?: boolean;  // Indicates if this result was produced by fallback processing
   };
 };
 
@@ -23,6 +24,7 @@ export type JobErrorDetails = {
   isTimeout?: boolean;
   stackTrace?: string;
   code?: string;
+  originalError?: string;  // Stores the original error message when fallback fails
 };
 
 // Job status type

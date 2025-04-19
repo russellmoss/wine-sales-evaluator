@@ -37,12 +37,28 @@ export interface EvaluationData {
   
   // Optional fields
   totalScore?: number;              // Alternative field for overallScore (will be converted)
+  criteria: {
+    [key: string]: {
+      score: number;
+      feedback: string;
+    };
+  };
+  metadata?: {
+    chunkCount?: number;
+    processingTime?: number;
+    chunkSizes?: number[];
+  };
 }
 
 // Validation error interface
 export interface ValidationError {
   field: string;
   message: string;
+}
+
+export interface ValidationResult {
+  isValid: boolean;
+  errors: ValidationError[];
 }
 
 // Criteria weights - must total 100
@@ -91,7 +107,9 @@ export function calculateTotalScore(criteriaScores: CriterionScore[]): number {
 }
 
 // Helper function to validate evaluation data
-export function validateEvaluationData(data: EvaluationData): boolean {
+export function validateEvaluationData(data: EvaluationData): ValidationResult {
+  const errors: ValidationError[] = [];
+  
   try {
     // Allow for either overallScore or totalScore
     if (data.totalScore !== undefined && data.overallScore === undefined) {
@@ -110,37 +128,74 @@ export function validateEvaluationData(data: EvaluationData): boolean {
     }
     
     // Validate required fields
-    if (!data.staffName) return false;
-    if (!data.date) return false;
-    if (typeof data.overallScore !== 'number' || isNaN(data.overallScore)) return false;
-    if (!data.performanceLevel) return false;
+    if (!data.staffName) errors.push({ field: 'staffName', message: 'Staff name is required' });
+    if (!data.date) errors.push({ field: 'date', message: 'Date is required' });
+    if (typeof data.overallScore !== 'number' || isNaN(data.overallScore)) {
+      errors.push({ field: 'overallScore', message: 'Overall score must be a valid number' });
+    }
+    if (!data.performanceLevel) {
+      errors.push({ field: 'performanceLevel', message: 'Performance level is required' });
+    }
     
     // Validate criteria scores
-    if (!Array.isArray(data.criteriaScores) || data.criteriaScores.length !== 10) return false;
+    if (!Array.isArray(data.criteriaScores) || data.criteriaScores.length !== 10) {
+      errors.push({ field: 'criteriaScores', message: 'Must have exactly 10 criteria scores' });
+    }
     
     // Validate each criteria score
-    for (const score of data.criteriaScores) {
-      if (!score.criterion) return false;
-      if (typeof score.weight !== 'number' || isNaN(score.weight)) return false;
-      if (typeof score.score !== 'number' || isNaN(score.score)) return false;
-      if (typeof score.weightedScore !== 'number' || isNaN(score.weightedScore)) return false;
-      if (!score.notes) return false;
+    if (Array.isArray(data.criteriaScores)) {
+      data.criteriaScores.forEach((score, index) => {
+        if (!score.criterion) {
+          errors.push({ field: `criteriaScores[${index}].criterion`, message: 'Criterion name is required' });
+        }
+        if (typeof score.weight !== 'number' || isNaN(score.weight)) {
+          errors.push({ field: `criteriaScores[${index}].weight`, message: 'Weight must be a valid number' });
+        }
+        if (typeof score.score !== 'number' || isNaN(score.score)) {
+          errors.push({ field: `criteriaScores[${index}].score`, message: 'Score must be a valid number' });
+        }
+        if (typeof score.weightedScore !== 'number' || isNaN(score.weightedScore)) {
+          errors.push({ field: `criteriaScores[${index}].weightedScore`, message: 'Weighted score must be a valid number' });
+        }
+        if (!score.notes) {
+          errors.push({ field: `criteriaScores[${index}].notes`, message: 'Notes are required' });
+        }
+      });
     }
     
     // Validate observational notes
-    if (!data.observationalNotes) return false;
-    if (!data.observationalNotes.productKnowledge) return false;
-    if (!data.observationalNotes.handlingObjections) return false;
+    if (!data.observationalNotes) {
+      errors.push({ field: 'observationalNotes', message: 'Observational notes are required' });
+    } else {
+      if (!data.observationalNotes.productKnowledge) {
+        errors.push({ field: 'observationalNotes.productKnowledge', message: 'Product knowledge notes are required' });
+      }
+      if (!data.observationalNotes.handlingObjections) {
+        errors.push({ field: 'observationalNotes.handlingObjections', message: 'Objection handling notes are required' });
+      }
+    }
     
     // Validate arrays
-    if (!Array.isArray(data.strengths) || data.strengths.length !== 3) return false;
-    if (!Array.isArray(data.areasForImprovement) || data.areasForImprovement.length !== 3) return false;
-    if (!Array.isArray(data.keyRecommendations) || data.keyRecommendations.length !== 3) return false;
+    if (!Array.isArray(data.strengths) || data.strengths.length !== 3) {
+      errors.push({ field: 'strengths', message: 'Must have exactly 3 strengths' });
+    }
+    if (!Array.isArray(data.areasForImprovement) || data.areasForImprovement.length !== 3) {
+      errors.push({ field: 'areasForImprovement', message: 'Must have exactly 3 areas for improvement' });
+    }
+    if (!Array.isArray(data.keyRecommendations) || data.keyRecommendations.length !== 3) {
+      errors.push({ field: 'keyRecommendations', message: 'Must have exactly 3 key recommendations' });
+    }
     
-    return true;
+    return {
+      isValid: errors.length === 0,
+      errors
+    };
   } catch (error) {
     console.error('Error validating evaluation data:', error);
-    return false;
+    return {
+      isValid: false,
+      errors: [{ field: 'validation', message: 'An error occurred during validation' }]
+    };
   }
 }
 
@@ -175,6 +230,8 @@ export function createEmptyEvaluation(staffName: string): EvaluationData {
     strengths: [],
     areasForImprovement: [],
     keyRecommendations: [],
-    rubricId: ''
+    rubricId: '',
+    criteria: {},
+    metadata: {}
   };
 } 

@@ -6,6 +6,7 @@ import { validateEvaluationData } from '../utils/validation';
 import { EvaluationData } from '../types/evaluation';
 import { Rubric } from '../types/rubric';
 import { RubricApi } from '../utils/rubric-api';
+import ModelSelector, { ModelType } from './ModelSelector';
 
 interface MarkdownImporterProps {
   onAnalysisComplete: (data: EvaluationData, markdown: string, fileName: string) => void;
@@ -21,6 +22,7 @@ const MarkdownImporter: FC<MarkdownImporterProps> = ({ onAnalysisComplete, isAna
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
+  const [selectedModel, setSelectedModel] = useState<ModelType>('claude');
   
   const [rubrics, setRubrics] = useState<Rubric[]>([]);
   const [selectedRubricId, setSelectedRubricId] = useState<string>('');
@@ -157,7 +159,8 @@ const MarkdownImporter: FC<MarkdownImporterProps> = ({ onAnalysisComplete, isAna
             markdown: markdown,
             fileName: fileName,
             directEvaluation: true,
-            rubricId: selectedRubricId || undefined
+            rubricId: selectedRubricId || undefined,
+            model: selectedModel
           }),
         });
         
@@ -347,6 +350,12 @@ const MarkdownImporter: FC<MarkdownImporterProps> = ({ onAnalysisComplete, isAna
           disabled={isAnalyzing || loadingRubrics}
         />
       </div>
+      
+      <ModelSelector
+        selectedModel={selectedModel}
+        onModelChange={setSelectedModel}
+        disabled={isAnalyzing || loadingRubrics}
+      />
       
       <div className="mb-6">
         <label className="block text-sm font-medium text-gray-700 mb-2">

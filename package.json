@@ -8,11 +8,14 @@
     "start": "node server.js",
     "lint": "next lint",
     "test": "jest",
-    "cleanup": "node scripts/cleanup.js"
+    "cleanup": "node scripts/cleanup.js",
+    "test:chunker": "ts-node --project scripts/tsconfig.json scripts/test-conversation-chunker.ts",
+    "test:chunking": "ts-node --project scripts/tsconfig.json scripts/test-chunking-scenarios.ts",
+    "init:rubrics": "ts-node --project scripts/tsconfig.json scripts/initialize-rubrics.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.18.0",
-    "@google/generative-ai": "^0.24.0",
+    "@google/generative-ai": "^0.2.0",
     "@netlify/functions": "^2.6.0",
     "@react-pdf/renderer": "^3.3.8",
     "jspdf": "^3.0.1",
@@ -33,11 +36,13 @@
     "@typescript-eslint/eslint-plugin": "^7.1.0",
     "@typescript-eslint/parser": "^7.1.0",
     "autoprefixer": "^10.4.17",
+    "dotenv": "^16.5.0",
     "eslint": "^8.57.0",
     "eslint-config-next": "14.1.0",
     "jest": "^29.7.0",
     "postcss": "^8.4.35",
     "tailwindcss": "^3.4.1",
+    "ts-node": "^10.9.2",
     "typescript": "5.3.3"
   },
   "main": "next.config.js",
