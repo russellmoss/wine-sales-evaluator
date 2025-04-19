@@ -201,7 +201,38 @@ const MarkdownImporter: FC<MarkdownImporterProps> = ({ onAnalysisComplete, isAna
           throw new Error(errorData.error || `API error: ${response.status} ${response.statusText}`);
         }
         
-        const { jobId, result, message } = await response.json();
+        const data = await response.json();
+        
+        // Check if this is a direct evaluation response
+        if (data.direct && data.result) {
+          console.log('MarkdownImporter: Direct evaluation result received');
+          
+          // Add model information to the result
+          const resultWithModel = {
+            ...data.result,
+            model: data.model || selectedModel
+          };
+          
+          const validationResult = validateEvaluationData(resultWithModel);
+          if (!validationResult.isValid) {
+            console.warn('Validation issues found:', validationResult.errors);
+            toast.error('The evaluation data has some issues, but we\'ll try to use it anyway');
+          }
+          
+          onAnalysisComplete(validationResult.data, markdown, fileName);
+          toast.success(`${data.model === 'gemini' ? 'Gemini' : 'Claude'} evaluation completed successfully!`);
+          
+          if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+          }
+          setMarkdown(null);
+          setFileName('');
+          
+          return;
+        }
+        
+        // If not a direct response, handle as a job
+        const { jobId, result, message } = data;
         
         if (!result) {
           throw new Error('No result returned from direct evaluation');

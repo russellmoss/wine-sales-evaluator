@@ -64,21 +64,43 @@ export async function POST(request: NextRequest) {
         }
         
         console.log('API: Using Gemini model for evaluation');
-        const result = await evaluateWithGemini(contentToAnalyze, rubricId);
-        return NextResponse.json({
-          jobId: Date.now().toString(),
-          result,
-          model: 'gemini'
-        });
+        try {
+          const result = await evaluateWithGemini(contentToAnalyze, rubricId);
+          console.log('API: Gemini evaluation completed successfully');
+          
+          // Return the result directly without storing as a job
+          return NextResponse.json({
+            result,
+            model: 'gemini',
+            direct: true // Add flag to indicate this is a direct evaluation
+          });
+        } catch (error) {
+          console.error('API: Error evaluating with Gemini:', error);
+          return NextResponse.json(
+            { error: error instanceof Error ? error.message : 'Error evaluating with Gemini' },
+            { status: 500 }
+          );
+        }
       } else {
         // Handle Claude evaluation here
         console.log('API: Using Claude model for evaluation');
-        const result = await evaluateConversationInChunks(contentToAnalyze, rubricId);
-        return NextResponse.json({
-          jobId: Date.now().toString(),
-          result,
-          model: 'claude'
-        });
+        try {
+          const result = await evaluateConversationInChunks(contentToAnalyze, rubricId);
+          console.log('API: Claude evaluation completed successfully');
+          
+          // Return the result directly without storing as a job
+          return NextResponse.json({
+            result,
+            model: 'claude',
+            direct: true // Add flag to indicate this is a direct evaluation
+          });
+        } catch (error) {
+          console.error('API: Error evaluating with Claude:', error);
+          return NextResponse.json(
+            { error: error instanceof Error ? error.message : 'Error evaluating with Claude' },
+            { status: 500 }
+          );
+        }
       }
     }
     
