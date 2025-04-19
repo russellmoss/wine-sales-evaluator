@@ -806,9 +806,9 @@ export function getStorageProvider(): StorageProvider {
 
   // Determine appropriate storage directory
   let storageDir;
-  if (process.env.NODE_ENV === 'production' && process.env.RENDER === 'true') {
+  if (isRender) {
     // For Render production, use the persistent disk mount path
-    storageDir = process.env.RENDER_STORAGE_DIR || '/var/data/jobs';
+    storageDir = process.env.RENDER_STORAGE_DIR || '/opt/render/project/src/.render/jobs';
     console.log(`Storage Provider: Using Render persistent storage at ${storageDir}`);
   } else if (process.env.NODE_ENV === 'production') {
     // For other production environments (not Render)
@@ -825,7 +825,8 @@ export function getStorageProvider(): StorageProvider {
     storageDir,
     '/tmp/jobs',
     path.join(process.cwd(), 'jobs'),
-    path.join(process.cwd(), '.jobs')
+    path.join(process.cwd(), '.jobs'),
+    path.join(process.cwd(), '.render', 'jobs')
   ];
   
   let selectedDir = null;

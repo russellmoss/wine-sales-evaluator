@@ -48,10 +48,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No markdown content provided' }, { status: 400 });
     }
     
-    if (!fileName) {
-      console.error('API: No file name provided in request');
-      return NextResponse.json({ error: 'No file name provided' }, { status: 400 });
-    }
+    // Generate a default file name if none is provided
+    const fileNameToUse = fileName || `conversation-${Date.now()}.md`;
+    console.log(`API: Using file name: ${fileNameToUse}`);
     
     // If direct evaluation is requested, evaluate directly without storing in file system
     if (directEvaluation) {

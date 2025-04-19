@@ -1,33 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getStorageProvider } from '../../../app/utils/storage';
+import { getStorageProvider } from '@/app/utils/storage';
 
 export async function GET(request: NextRequest) {
+  const searchParams = request.nextUrl.searchParams;
+  const jobId = searchParams.get('jobId');
+
+  if (!jobId) {
+    return NextResponse.json({ error: 'No job ID provided' }, { status: 400 });
+  }
+
+  console.log(`Checking status for job: ${jobId}`);
+  console.log('Environment:', process.env.NODE_ENV);
+  console.log('Render environment:', process.env.RENDER === 'true' ? 'yes' : 'no');
+
   try {
-    // Get the jobId query parameter
-    const jobId = request.nextUrl.searchParams.get('jobId');
-    
-    if (!jobId) {
-      return NextResponse.json({ error: 'No job ID provided' }, { status: 400 });
-    }
-    
-    // Initialize storage provider
     const storage = getStorageProvider();
+    const jobData = await storage.getJob(jobId);
     
-    // Get the job from storage
-    const job = await storage.getJob(jobId);
-    
-    if (!job) {
+    if (!jobData) {
+      console.log(`Job not found for ID: ${jobId}`);
       return NextResponse.json({ error: 'Job not found' }, { status: 404 });
     }
-    
-    // Return the job status
-    return NextResponse.json(job);
-    
+
+    console.log('Job data found:', {
+      status: jobData.status,
+      hasResult: !!jobData.result,
+      error: jobData.error
+    });
+
+    return NextResponse.json(jobData);
   } catch (error) {
-    console.error('Error in check-job-status route:', error);
-    return NextResponse.json({ 
-      error: 'Internal server error',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 });
+    console.error('Error checking job status:', error);
+    return NextResponse.json(
+      { error: 'Failed to check job status' },
+      { status: 500 }
+    );
   }
 } 

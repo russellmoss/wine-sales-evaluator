@@ -153,250 +153,89 @@ const MarkdownImporter: FC<MarkdownImporterProps> = ({ onAnalysisComplete, isAna
 
   const analyzeConversation = async () => {
     if (!markdown) {
-      toast.error('Please select a markdown file first');
+      toast.error('Please upload a markdown file first');
       return;
     }
-    
+
     try {
       setIsAnalyzing(true);
       setError(null);
-      setJobId(null);
 
-      console.log('MarkdownImporter: Starting analysis with markdown length:', markdown.length);
-      console.log('MarkdownImporter: File name:', fileName);
-      console.log('MarkdownImporter: Selected rubric ID:', selectedRubricId);
-      console.log('MarkdownImporter: Selected model:', selectedModel);
+      // Generate a consistent job ID
+      const timestamp = Date.now();
+      const randomStr = Math.random().toString(36).substring(2, 8);
+      const jobId = `job_${timestamp}_${randomStr}`;
+      setJobId(jobId);
 
-      const useDirectEvaluation = process.env.NEXT_PUBLIC_USE_DIRECT_EVALUATION === 'true' || 
-                                  process.env.NODE_ENV === 'development';
-      
-      if (useDirectEvaluation) {
-        console.log('MarkdownImporter: Using direct evaluation mode with rubric:', selectedRubricId);
-        console.log('MarkdownImporter: Using model:', selectedModel);
-        toast('Using direct evaluation mode');
-        
-        const requestBody = {
-          markdown: markdown,
-          fileName: fileName,
-          rubricId: selectedRubricId || undefined,
-          model: selectedModel,
-          directEvaluation: true
-        };
-        
-        console.log('MarkdownImporter: Request body keys:', Object.keys(requestBody));
-        console.log('MarkdownImporter: Request body markdown length:', requestBody.markdown ? requestBody.markdown.length : 0);
-        console.log('MarkdownImporter: Request body fileName:', requestBody.fileName);
-        
-        const response = await fetch('/api/analyze-conversation', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(requestBody),
-        });
-        
-        console.log('MarkdownImporter: API response status:', response.status);
-        
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-          console.error('API error response:', errorData);
-          throw new Error(errorData.error || `API error: ${response.status} ${response.statusText}`);
-        }
-        
-        const data = await response.json();
-        console.log('MarkdownImporter: API response data keys:', Object.keys(data));
-        console.log('MarkdownImporter: API response has direct flag:', !!data.direct);
-        console.log('MarkdownImporter: API response has result:', !!data.result);
-        
-        // Check if this is a direct evaluation response
-        if (data.direct && data.result) {
-          console.log('MarkdownImporter: Direct evaluation result received');
-          console.log('MarkdownImporter: Result model:', data.model);
-          
-          // Add model information to the result
-          const resultWithModel = {
-            ...data.result,
-            model: data.model || selectedModel
-          };
-          
-          console.log('MarkdownImporter: Result with model keys:', Object.keys(resultWithModel));
-          
-          const validationResult = validateEvaluationData(resultWithModel);
-          if (!validationResult.isValid) {
-            console.warn('Validation issues found:', validationResult.errors);
-            toast.error('The evaluation data has some issues, but we\'ll try to use it anyway');
-          }
-          
-          console.log('MarkdownImporter: Calling onAnalysisComplete with validated data');
-          onAnalysisComplete(validationResult.data, markdown, fileName);
-          toast.success(`${data.model === 'gemini' ? 'Gemini' : 'Claude'} evaluation completed successfully!`);
-          
-          if (fileInputRef.current) {
-            fileInputRef.current.value = '';
-          }
-          setMarkdown(null);
-          setFileName('');
-          
-          return;
-        }
-        
-        // If not a direct response, handle as a job
-        const { jobId, result, message } = data;
-        
-        if (!result) {
-          throw new Error('No result returned from direct evaluation');
-        }
-        
-        // Add model information to the result
-        const resultWithModel = {
-          ...result,
-          model: selectedModel
-        };
-        
-        const validationResult = validateEvaluationData(resultWithModel);
-        if (!validationResult.isValid) {
-          console.warn('Validation issues found:', validationResult.errors);
-          toast.error('The evaluation data has some issues, but we\'ll try to use it anyway');
-        }
-        
-        onAnalysisComplete(validationResult.data, markdown, fileName);
-        toast.success(`${selectedModel === 'gemini' ? 'Gemini' : 'Claude'} evaluation completed successfully!`);
-        
-        if (fileInputRef.current) {
-          fileInputRef.current.value = '';
-        }
-        setMarkdown(null);
-        setFileName('');
-        setJobId(jobId);
-        
-        return;
-      }
+      console.log('Starting analysis with job ID:', jobId);
 
+      // Send the markdown content to the API
       const response = await fetch('/api/analyze-conversation', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          markdown: markdown,
-          fileName: fileName,
-          rubricId: selectedRubricId || undefined,
-          model: selectedModel
+          markdown,
+          fileName,
+          jobId,
+          rubricId: selectedRubricId,
+          model: 'gemini'
         }),
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        console.error('API error response:', errorData);
-        throw new Error(errorData.error || `API error: ${response.status} ${response.statusText}`);
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to analyze conversation');
       }
 
-      const { jobId, message } = await response.json();
-      
-      if (!jobId) {
-        throw new Error('No job ID received');
-      }
-      
-      setJobId(jobId);
-      
-      toast.success('Analysis started! This may take a minute...');
+      const data = await response.json();
+      console.log('Analysis response:', data);
 
-      let completed = false;
-      let result = null;
-      let retryCount = 0;
-      const startTime = Date.now();
-      const MAX_POLLING_TIME = 300000;
-      
-      while (!completed && retryCount < 20 && (Date.now() - startTime) < MAX_POLLING_TIME) {
-        await new Promise(resolve => setTimeout(resolve, 3000));
-        
+      // Start polling for job status
+      let retries = 0;
+      const maxRetries = 20;
+      const pollInterval = 3000; // 3 seconds
+
+      const pollJobStatus = async () => {
         try {
-          const statusResponse = await fetch(`/api/check-job-status?jobId=${jobId}`, {
-            method: 'GET'
-          });
+          console.log(`Polling job status (attempt ${retries + 1}/${maxRetries}) for job ID: ${jobId}`);
+          const statusResponse = await fetch(`/api/check-job-status?jobId=${jobId}`);
           
           if (!statusResponse.ok) {
-            if (statusResponse.status === 404) {
-              console.log(`Job ${jobId} not found yet, retrying... (${retryCount + 1}/20)`);
-              retryCount++;
-              continue;
-            }
-            throw new Error(`Error checking status: ${statusResponse.status}`);
+            throw new Error('Failed to check job status');
           }
-          
-          const job = await statusResponse.json();
-          
-          if (job.status === 'completed') {
-            completed = true;
-            result = job.result;
-          } else if (job.status === 'failed') {
-            throw new Error(job.error || 'Analysis failed');
+
+          const statusData = await statusResponse.json();
+          console.log('Job status response:', statusData);
+
+          if (statusData.status === 'completed') {
+            console.log('Job completed successfully');
+            if (statusData.results) {
+              onAnalysisComplete(statusData.results, markdown, fileName);
+            } else {
+              throw new Error('No results found in completed job');
+            }
+          } else if (statusData.status === 'failed') {
+            throw new Error(statusData.error || 'Job failed');
+          } else if (retries < maxRetries) {
+            retries++;
+            setTimeout(pollJobStatus, pollInterval);
           } else {
-            console.log(`Job status: ${job.status}`);
+            throw new Error('Job timed out');
           }
         } catch (error) {
-          console.error('Error checking job status:', error);
-          retryCount++;
+          console.error('Error polling job status:', error);
+          setError(error instanceof Error ? error.message : 'An error occurred');
+          setIsAnalyzing(false);
         }
-      }
-      
-      if (!completed) {
-        console.error(`Job polling timed out after ${(Date.now() - startTime) / 1000} seconds`);
-        
-        toast('Background job timed out. Trying direct evaluation...');
-        
-        const directResponse = await fetch('/api/analyze-conversation', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            conversation: markdown,
-            staffName: 'Staff Member',
-            date: new Date().toISOString().split('T')[0],
-            directEvaluation: true,
-            rubricId: selectedRubricId || undefined
-          }),
-        });
+      };
 
-        if (!directResponse.ok) {
-          throw new Error('Direct evaluation also failed');
-        }
-
-        const { result: directResult } = await directResponse.json();
-        
-        if (!directResult) {
-          throw new Error('No result returned from direct evaluation');
-        }
-        
-        result = directResult;
-      }
-      
-      if (!result) {
-        throw new Error('No result returned from analysis');
-      }
-      
-      const validationResult = validateEvaluationData(result);
-      if (!validationResult.isValid) {
-        console.warn('Validation issues found:', validationResult.errors);
-        toast.error('The evaluation data has some issues, but we\'ll try to use it anyway');
-      }
-      
-      onAnalysisComplete(validationResult.data, markdown, fileName);
-      toast.success('Conversation analyzed successfully!');
-      
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-      setMarkdown(null);
-      setFileName('');
-      setJobId(null);
-      
+      // Start polling
+      pollJobStatus();
     } catch (error) {
       console.error('Error analyzing conversation:', error);
-      setError(error instanceof Error ? error.message : 'An error occurred during analysis');
-      toast.error(error instanceof Error ? error.message : 'Error analyzing conversation. Please try again.');
-    } finally {
+      setError(error instanceof Error ? error.message : 'An error occurred');
       setIsAnalyzing(false);
     }
   };
