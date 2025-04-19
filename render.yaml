@@ -1,24 +1,36 @@
 services:
   - type: web
-    name: wine-sales-evaluator
+    name: winery-sales-evaluator
     env: node
-    buildCommand: npm ci --include=dev && npm run build && chmod +x render-setup.sh
-    startCommand: ./render-setup.sh && node server.js
-    healthCheckPath: /api/health
+    plan: standard
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start
+    nodeVersion: 18.x # Next.js recommended version
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: CLAUDE_API_KEY
+        sync: false # Indicates this should be set manually in Render dashboard
+      - key: GEMINI_API_KEY
+        sync: false
+    scaling:
+      minInstances: 1
+      maxInstances: 1
+    resources:
+      cpu: 1000m # 1 CPU
+      memory: 2Gi # 2GB RAM
+    healthCheckPath: /api/health # You'll need to create this endpoint
+    autoDeploy: true
+    domains:
+      - fromEnv: RENDER_EXTERNAL_URL # Render will automatically set this
     # Define a persistent disk for storage
     disk:
       name: wine-evaluator-data
       mountPath: /var/data
       sizeGB: 1
     envVars:
-      - key: NODE_ENV
-        value: production
       - key: RENDER
         value: "true"
-      - key: CLAUDE_API_KEY
-        sync: false # This will be set via Render dashboard
-      - key: GEMINI_API_KEY
-        sync: false # This will be set via Render dashboard
       - key: RENDER_STORAGE_DIR
         value: /var/data/storage
       - key: JOB_STORAGE_TYPE
@@ -32,6 +44,4 @@ services:
     # Add build-time environment variables if needed
     buildEnv:
       - key: NEXT_TELEMETRY_DISABLED
-        value: "1"
-    # Auto-deploy settings
-    autoDeploy: true 
+        value: "1" 
