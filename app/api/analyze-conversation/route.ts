@@ -67,13 +67,17 @@ export async function POST(request: NextRequest) {
         try {
           const result = await evaluateWithGemini(contentToAnalyze, rubricId);
           console.log('API: Gemini evaluation completed successfully');
+          console.log('API: Gemini result structure:', Object.keys(result));
           
           // Return the result directly without storing as a job
-          return NextResponse.json({
+          const response = {
             result,
             model: 'gemini',
             direct: true // Add flag to indicate this is a direct evaluation
-          });
+          };
+          
+          console.log('API: Returning direct Gemini response with keys:', Object.keys(response));
+          return NextResponse.json(response);
         } catch (error) {
           console.error('API: Error evaluating with Gemini:', error);
           return NextResponse.json(
@@ -87,13 +91,17 @@ export async function POST(request: NextRequest) {
         try {
           const result = await evaluateConversationInChunks(contentToAnalyze, rubricId);
           console.log('API: Claude evaluation completed successfully');
+          console.log('API: Claude result structure:', Object.keys(result));
           
           // Return the result directly without storing as a job
-          return NextResponse.json({
+          const response = {
             result,
             model: 'claude',
             direct: true // Add flag to indicate this is a direct evaluation
-          });
+          };
+          
+          console.log('API: Returning direct Claude response with keys:', Object.keys(response));
+          return NextResponse.json(response);
         } catch (error) {
           console.error('API: Error evaluating with Claude:', error);
           return NextResponse.json(

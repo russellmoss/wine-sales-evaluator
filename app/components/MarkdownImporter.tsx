@@ -195,6 +195,8 @@ const MarkdownImporter: FC<MarkdownImporterProps> = ({ onAnalysisComplete, isAna
           body: JSON.stringify(requestBody),
         });
         
+        console.log('MarkdownImporter: API response status:', response.status);
+        
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
           console.error('API error response:', errorData);
@@ -202,10 +204,14 @@ const MarkdownImporter: FC<MarkdownImporterProps> = ({ onAnalysisComplete, isAna
         }
         
         const data = await response.json();
+        console.log('MarkdownImporter: API response data keys:', Object.keys(data));
+        console.log('MarkdownImporter: API response has direct flag:', !!data.direct);
+        console.log('MarkdownImporter: API response has result:', !!data.result);
         
         // Check if this is a direct evaluation response
         if (data.direct && data.result) {
           console.log('MarkdownImporter: Direct evaluation result received');
+          console.log('MarkdownImporter: Result model:', data.model);
           
           // Add model information to the result
           const resultWithModel = {
@@ -213,12 +219,15 @@ const MarkdownImporter: FC<MarkdownImporterProps> = ({ onAnalysisComplete, isAna
             model: data.model || selectedModel
           };
           
+          console.log('MarkdownImporter: Result with model keys:', Object.keys(resultWithModel));
+          
           const validationResult = validateEvaluationData(resultWithModel);
           if (!validationResult.isValid) {
             console.warn('Validation issues found:', validationResult.errors);
             toast.error('The evaluation data has some issues, but we\'ll try to use it anyway');
           }
           
+          console.log('MarkdownImporter: Calling onAnalysisComplete with validated data');
           onAnalysisComplete(validationResult.data, markdown, fileName);
           toast.success(`${data.model === 'gemini' ? 'Gemini' : 'Claude'} evaluation completed successfully!`);
           

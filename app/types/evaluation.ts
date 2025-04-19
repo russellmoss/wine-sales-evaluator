@@ -111,34 +111,60 @@ export function validateEvaluationData(data: EvaluationData): ValidationResult {
   const errors: ValidationError[] = [];
   
   try {
+    console.log('Starting validation of evaluation data:', {
+      hasStaffName: Boolean(data.staffName),
+      hasDate: Boolean(data.date),
+      hasOverallScore: Boolean(data.overallScore),
+      hasPerformanceLevel: Boolean(data.performanceLevel),
+      criteriaScoresLength: data.criteriaScores?.length,
+      hasStrengths: Boolean(data.strengths),
+      hasAreasForImprovement: Boolean(data.areasForImprovement),
+      hasKeyRecommendations: Boolean(data.keyRecommendations)
+    });
+    
     // Allow for either overallScore or totalScore
     if (data.totalScore !== undefined && data.overallScore === undefined) {
+      console.log('Converting totalScore to overallScore:', data.totalScore);
       data.overallScore = data.totalScore;
       delete data.totalScore; // Clean up to avoid confusion
     }
     
     // Convert string scores to numbers if needed
     if (typeof data.overallScore === 'string') {
+      console.log('Converting string overallScore to number:', data.overallScore);
       data.overallScore = parseFloat(data.overallScore);
     }
     
     // Ensure score is in percentage form (0-100)
     if (data.overallScore > 100) {
+      console.log('Normalizing overallScore from raw score to percentage:', data.overallScore);
       data.overallScore = Math.round((data.overallScore / 500) * 100);
     }
     
     // Validate required fields
-    if (!data.staffName) errors.push({ field: 'staffName', message: 'Staff name is required' });
-    if (!data.date) errors.push({ field: 'date', message: 'Date is required' });
+    if (!data.staffName) {
+      console.log('Missing staffName');
+      errors.push({ field: 'staffName', message: 'Staff name is required' });
+    }
+    if (!data.date) {
+      console.log('Missing date');
+      errors.push({ field: 'date', message: 'Date is required' });
+    }
     if (typeof data.overallScore !== 'number' || isNaN(data.overallScore)) {
+      console.log('Invalid overallScore:', data.overallScore);
       errors.push({ field: 'overallScore', message: 'Overall score must be a valid number' });
     }
     if (!data.performanceLevel) {
+      console.log('Missing performanceLevel');
       errors.push({ field: 'performanceLevel', message: 'Performance level is required' });
     }
     
     // Validate criteria scores
     if (!Array.isArray(data.criteriaScores) || data.criteriaScores.length !== 10) {
+      console.log('Invalid criteriaScores:', {
+        isArray: Array.isArray(data.criteriaScores),
+        length: data.criteriaScores?.length
+      });
       errors.push({ field: 'criteriaScores', message: 'Must have exactly 10 criteria scores' });
     }
     
@@ -146,18 +172,23 @@ export function validateEvaluationData(data: EvaluationData): ValidationResult {
     if (Array.isArray(data.criteriaScores)) {
       data.criteriaScores.forEach((score, index) => {
         if (!score.criterion) {
+          console.log(`Missing criterion name at index ${index}`);
           errors.push({ field: `criteriaScores[${index}].criterion`, message: 'Criterion name is required' });
         }
         if (typeof score.weight !== 'number' || isNaN(score.weight)) {
+          console.log(`Invalid weight at index ${index}:`, score.weight);
           errors.push({ field: `criteriaScores[${index}].weight`, message: 'Weight must be a valid number' });
         }
         if (typeof score.score !== 'number' || isNaN(score.score)) {
+          console.log(`Invalid score at index ${index}:`, score.score);
           errors.push({ field: `criteriaScores[${index}].score`, message: 'Score must be a valid number' });
         }
         if (typeof score.weightedScore !== 'number' || isNaN(score.weightedScore)) {
+          console.log(`Invalid weightedScore at index ${index}:`, score.weightedScore);
           errors.push({ field: `criteriaScores[${index}].weightedScore`, message: 'Weighted score must be a valid number' });
         }
         if (!score.notes) {
+          console.log(`Missing notes at index ${index}`);
           errors.push({ field: `criteriaScores[${index}].notes`, message: 'Notes are required' });
         }
       });
@@ -165,27 +196,43 @@ export function validateEvaluationData(data: EvaluationData): ValidationResult {
     
     // Validate observational notes
     if (!data.observationalNotes) {
+      console.log('Missing observationalNotes');
       errors.push({ field: 'observationalNotes', message: 'Observational notes are required' });
     } else {
       if (!data.observationalNotes.productKnowledge) {
+        console.log('Missing productKnowledge');
         errors.push({ field: 'observationalNotes.productKnowledge', message: 'Product knowledge notes are required' });
       }
       if (!data.observationalNotes.handlingObjections) {
+        console.log('Missing handlingObjections');
         errors.push({ field: 'observationalNotes.handlingObjections', message: 'Objection handling notes are required' });
       }
     }
     
     // Validate arrays
     if (!Array.isArray(data.strengths) || data.strengths.length !== 3) {
+      console.log('Invalid strengths array:', {
+        isArray: Array.isArray(data.strengths),
+        length: data.strengths?.length
+      });
       errors.push({ field: 'strengths', message: 'Must have exactly 3 strengths' });
     }
     if (!Array.isArray(data.areasForImprovement) || data.areasForImprovement.length !== 3) {
+      console.log('Invalid areasForImprovement array:', {
+        isArray: Array.isArray(data.areasForImprovement),
+        length: data.areasForImprovement?.length
+      });
       errors.push({ field: 'areasForImprovement', message: 'Must have exactly 3 areas for improvement' });
     }
     if (!Array.isArray(data.keyRecommendations) || data.keyRecommendations.length !== 3) {
+      console.log('Invalid keyRecommendations array:', {
+        isArray: Array.isArray(data.keyRecommendations),
+        length: data.keyRecommendations?.length
+      });
       errors.push({ field: 'keyRecommendations', message: 'Must have exactly 3 key recommendations' });
     }
     
+    console.log('Validation complete. Errors:', errors.length);
     return {
       isValid: errors.length === 0,
       errors
