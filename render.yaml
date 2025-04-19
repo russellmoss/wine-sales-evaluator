@@ -3,7 +3,7 @@ services:
     name: winery-sales-evaluator
     env: node
     plan: standard
-    buildCommand: npm ci && npm run build
+    buildCommand: npm install && npm run build
     startCommand: npm run start
     nodeVersion: 18.x # Next.js recommended version
     envVars:
