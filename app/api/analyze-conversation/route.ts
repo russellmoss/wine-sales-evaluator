@@ -87,11 +87,16 @@ export async function POST(request: NextRequest) {
       console.log('API: Using markdown field for conversation');
     }
     
-    const { conversation: conversationFromBody, staffName, date } = { conversation: conversation, staffName: 'Staff Member', date: new Date().toISOString().split('T')[0] };
+    // Create a conversation object from the content
+    const conversationObj = { 
+      conversation: contentToAnalyze, 
+      staffName: 'Staff Member', 
+      date: new Date().toISOString().split('T')[0] 
+    };
     
     console.log(`API: Analyzing conversation with model: ${model || 'claude'}`);
     
-    if (!conversationFromBody) {
+    if (!conversationObj.conversation) {
       console.error('API: Missing conversation in request body');
       return NextResponse.json(
         { error: 'Missing conversation in request body' },
@@ -99,11 +104,11 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    console.log(`API: Conversation length: ${conversationFromBody.length} characters`);
+    console.log(`API: Conversation length: ${conversationObj.conversation.length} characters`);
     
     // Set default values for optional parameters
-    const staffNameToUse = staffName || 'Staff Member';
-    const dateToUse = date || new Date().toISOString().split('T')[0];
+    const staffNameToUse = conversationObj.staffName || 'Staff Member';
+    const dateToUse = conversationObj.date || new Date().toISOString().split('T')[0];
     const modelToUse = model?.toLowerCase() || 'claude';
     
     console.log(`API: Using staffName: ${staffNameToUse}`);
@@ -143,7 +148,7 @@ export async function POST(request: NextRequest) {
     if (modelToUse === 'gemini') {
       console.log('API: Using Gemini model for evaluation');
       try {
-        evaluation = await evaluateWithGemini(conversationFromBody, rubricId);
+        evaluation = await evaluateWithGemini(conversationObj.conversation, rubricId);
         console.log('API: Gemini evaluation completed successfully');
       } catch (error) {
         console.error('API: Error evaluating with Gemini:', error);
@@ -155,7 +160,7 @@ export async function POST(request: NextRequest) {
     } else {
       console.log('API: Using Claude model for evaluation');
       try {
-        evaluation = await evaluateConversationInChunks(conversationFromBody, staffNameToUse, dateToUse, rubricId);
+        evaluation = await evaluateConversationInChunks(conversationObj.conversation, staffNameToUse, dateToUse, rubricId);
         console.log('API: Claude evaluation completed successfully');
       } catch (error) {
         console.error('API: Error evaluating with Claude:', error);
