@@ -157,17 +157,17 @@ async function withTimeout<T>(
 
 /**
  * Analyzes a conversation chunk with Claude
- * @param chunk The conversation chunk to analyze
- * @param rubric The rubric to use for evaluation
+ * @param conversation The conversation chunk to analyze
  * @param staffName Name of the staff member
  * @param date Date of the conversation
+ * @param rubric The rubric to use for evaluation
  * @returns Evaluation data for the chunk
  */
 async function analyzeChunkWithClaude(
-  chunk: string,
-  rubric: Rubric,
+  conversation: string,
   staffName: string,
-  date: string
+  date: string,
+  rubric: Rubric
 ): Promise<EvaluationData> {
   const apiKey = process.env.CLAUDE_API_KEY;
   if (!apiKey) {
@@ -184,7 +184,7 @@ Staff Member: ${staffName}
 Date: ${date}
 
 Conversation:
-${chunk}
+${conversation}
 
 Please evaluate this conversation using the following rubric:
 ${JSON.stringify(rubric, null, 2)}
@@ -281,24 +281,29 @@ IMPORTANT:
 
 /**
  * Combines multiple chunk evaluations into a single evaluation
- * @param evaluations Array of chunk evaluations
+ * @param chunkResults Array of chunk evaluations
  * @param staffName Name of the staff member
  * @param date Date of the conversation
- * @param rubricId Optional rubric ID
+ * @param rubric The rubric to use for evaluation
  * @returns Combined evaluation
  */
-function combineEvaluations(evaluations: EvaluationData[]): EvaluationData {
-  if (evaluations.length === 0) {
+function combineChunkResults(
+  chunkResults: EvaluationData[],
+  staffName: string,
+  date: string,
+  rubric: Rubric
+): EvaluationData {
+  if (chunkResults.length === 0) {
     throw new Error('No evaluations to combine');
   }
 
-  if (evaluations.length === 1) {
-    return evaluations[0];
+  if (chunkResults.length === 1) {
+    return chunkResults[0];
   }
 
   // Calculate average scores
-  const totalScore = evaluations.reduce((sum, evaluation) => sum + evaluation.overallScore, 0);
-  const averageScore = Math.round(totalScore / evaluations.length);
+  const totalScore = chunkResults.reduce((sum, evaluation) => sum + evaluation.overallScore, 0);
+  const averageScore = Math.round(totalScore / chunkResults.length);
 
   // Determine performance level based on average score
   const performanceLevel = getPerformanceLevel(averageScore);
@@ -308,17 +313,17 @@ function combineEvaluations(evaluations: EvaluationData[]): EvaluationData {
   
   // Get all unique criteria keys
   const allCriteriaKeys = new Set<string>();
-  evaluations.forEach(evaluation => {
+  chunkResults.forEach(evaluation => {
     Object.keys(evaluation.criteria || {}).forEach(key => allCriteriaKeys.add(key));
   });
 
   // Calculate average scores for each criterion
   allCriteriaKeys.forEach(key => {
-    const scores = evaluations
+    const scores = chunkResults
       .map(evaluation => evaluation.criteria?.[key]?.score)
       .filter((score): score is number => score !== undefined);
     
-    const feedbacks = evaluations
+    const feedbacks = chunkResults
       .map(evaluation => evaluation.criteria?.[key]?.feedback)
       .filter((feedback): feedback is string => feedback !== undefined);
 
@@ -326,7 +331,7 @@ function combineEvaluations(evaluations: EvaluationData[]): EvaluationData {
       const avgScore = Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length);
       // Combine feedbacks with context about which part of the conversation they refer to
       const combinedFeedback = feedbacks.map((feedback, index) => 
-        `[Part ${index + 1}/${evaluations.length}]: ${feedback}`
+        `[Part ${index + 1}/${chunkResults.length}]: ${feedback}`
       ).join('\n');
       
       combinedCriteria[key] = {
@@ -338,21 +343,21 @@ function combineEvaluations(evaluations: EvaluationData[]): EvaluationData {
 
   // Create the combined evaluation
   return {
-    staffName: evaluations[0].staffName,
-    date: evaluations[0].date,
+    staffName,
+    date,
     overallScore: averageScore,
     performanceLevel,
-    criteriaScores: evaluations[0].criteriaScores, // Keep the structure from first evaluation
-    observationalNotes: evaluations[0].observationalNotes, // Keep the structure from first evaluation
-    strengths: evaluations[0].strengths,
-    areasForImprovement: evaluations[0].areasForImprovement,
-    keyRecommendations: evaluations[0].keyRecommendations,
-    rubricId: evaluations[0].rubricId,
+    criteriaScores: chunkResults[0].criteriaScores, // Keep the structure from first evaluation
+    observationalNotes: chunkResults[0].observationalNotes, // Keep the structure from first evaluation
+    strengths: chunkResults[0].strengths,
+    areasForImprovement: chunkResults[0].areasForImprovement,
+    keyRecommendations: chunkResults[0].keyRecommendations,
+    rubricId: rubric.id,
     criteria: combinedCriteria,
     metadata: {
-      chunkCount: evaluations.length,
-      processingTime: evaluations.reduce((sum, evaluation) => sum + (evaluation.metadata?.processingTime || 0), 0),
-      chunkSizes: evaluations.map(evaluation => evaluation.metadata?.chunkSizes || []).flat()
+      chunkCount: chunkResults.length,
+      processingTime: chunkResults.reduce((sum, evaluation) => sum + (evaluation.metadata?.processingTime || 0), 0),
+      chunkSizes: chunkResults.map(evaluation => evaluation.metadata?.chunkSizes || []).flat()
     }
   };
 }
@@ -367,18 +372,18 @@ function combineEvaluations(evaluations: EvaluationData[]): EvaluationData {
  */
 export async function evaluateConversationInChunks(
   conversation: string,
-  staffName: string,
-  date: string,
-  rubricId?: string,
-  maxChunkSize: number = CHUNK_CONFIG.MAX_CHUNK_SIZE,
-  overlapSize: number = CHUNK_CONFIG.OVERLAP_SIZE
+  staffName: string = 'Staff Member',
+  date: string = new Date().toISOString().split('T')[0],
+  rubricId?: string
 ): Promise<EvaluationData> {
   console.log(`Evaluating conversation of length ${conversation.length} characters`);
   
   // Load the rubric
   let rubric = null;
   if (rubricId) {
+    console.log(`API: GET /api/rubrics/${rubricId} - Retrieving rubric`);
     rubric = await RubricApi.getRubric(rubricId);
+    console.log(`API: Rubric ${rubricId} found`);
   }
   
   if (!rubric) {
@@ -390,48 +395,32 @@ export async function evaluateConversationInChunks(
       throw new Error('No rubric found for evaluation');
     }
   }
-
-  // Check if the conversation is small enough for direct evaluation
-  // Claude can handle up to 100K tokens, but we'll set a conservative limit
-  const MAX_DIRECT_EVALUATION_SIZE = 50000; // ~50K characters is a safe limit
-  const isSmallEnoughForDirectEvaluation = conversation.length <= MAX_DIRECT_EVALUATION_SIZE;
   
-  if (isSmallEnoughForDirectEvaluation) {
+  // Check if we should use direct evaluation
+  const useDirectEvaluation = process.env.NEXT_PUBLIC_USE_DIRECT_EVALUATION === 'true' || 
+                              process.env.NODE_ENV === 'development' ||
+                              conversation.length <= 50000; // Use direct evaluation for conversations up to 50,000 characters
+  
+  if (useDirectEvaluation) {
     console.log('Using direct evaluation for better context understanding');
-    try {
-      return await analyzeChunkWithClaude(conversation, rubric, staffName, date);
-    } catch (error) {
-      console.error('Direct evaluation failed, falling back to chunking:', error);
-      // Continue to chunking if direct evaluation fails
-    }
+    return analyzeChunkWithClaude(conversation, staffName, date, rubric);
   }
   
-  // For extremely large conversations, use chunking as a last resort
-  console.log(`Conversation too large for direct evaluation (${conversation.length} chars), using chunking as fallback`);
-  console.log(`Chunking conversation with max size: ${maxChunkSize}, overlap: ${overlapSize}`);
+  // For very large conversations, use chunking as a fallback
+  console.log('Using chunking for large conversation');
   
-  const chunks = chunkConversation(conversation, maxChunkSize, overlapSize);
+  // Split the conversation into chunks
+  const chunks = chunkConversation(conversation);
   console.log(`Split conversation into ${chunks.length} chunks`);
-
-  // If we only have one chunk, process it directly
-  if (chunks.length === 1) {
-    console.log('Processing single chunk');
-    return analyzeChunkWithClaude(chunks[0], rubric, staffName, date);
-  }
-
-  // Process each chunk
-  const chunkEvaluations: EvaluationData[] = [];
+  
+  // Analyze each chunk
+  const chunkResults: EvaluationData[] = [];
   for (let i = 0; i < chunks.length; i++) {
-    console.log(`Processing chunk ${i + 1}/${chunks.length}`);
-    try {
-      const chunkResult = await analyzeChunkWithClaude(chunks[i], rubric, staffName, date);
-      chunkEvaluations.push(chunkResult);
-    } catch (error) {
-      console.error(`Error processing chunk ${i + 1}:`, error);
-      throw error;
-    }
+    console.log(`Analyzing chunk ${i + 1}/${chunks.length}`);
+    const chunkResult = await analyzeChunkWithClaude(chunks[i], staffName, date, rubric);
+    chunkResults.push(chunkResult);
   }
-
-  // Combine the evaluations
-  return combineEvaluations(chunkEvaluations);
+  
+  // Combine the results
+  return combineChunkResults(chunkResults, staffName, date, rubric);
 } 
