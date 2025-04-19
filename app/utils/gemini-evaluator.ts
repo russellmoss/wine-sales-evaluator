@@ -76,7 +76,7 @@ export async function evaluateWithGemini(
 
   // Use the correct model name and configuration
   const model = genAI.getGenerativeModel({ 
-    model: "gemini-1.5-pro",
+    model: "gemini-pro",
     generationConfig: {
       temperature: 0.2, // Lower temperature for more consistent evaluations
       topK: 40,
