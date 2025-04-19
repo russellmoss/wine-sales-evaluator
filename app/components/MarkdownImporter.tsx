@@ -201,15 +201,18 @@ const MarkdownImporter: FC<MarkdownImporterProps> = ({ onAnalysisComplete, isAna
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          markdown: markdown,
-          fileName: fileName,
-          rubricId: selectedRubricId || undefined
+          conversation: markdown,
+          staffName: 'Staff Member',
+          date: new Date().toISOString().split('T')[0],
+          rubricId: selectedRubricId || undefined,
+          model: selectedModel
         }),
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || `Error: ${response.status}`);
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('API error response:', errorData);
+        throw new Error(errorData.error || `API error: ${response.status} ${response.statusText}`);
       }
 
       const { jobId, message } = await response.json();
@@ -272,8 +275,9 @@ const MarkdownImporter: FC<MarkdownImporterProps> = ({ onAnalysisComplete, isAna
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            markdown: markdown,
-            fileName: fileName,
+            conversation: markdown,
+            staffName: 'Staff Member',
+            date: new Date().toISOString().split('T')[0],
             directEvaluation: true,
             rubricId: selectedRubricId || undefined
           }),

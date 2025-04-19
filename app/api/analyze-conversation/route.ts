@@ -34,24 +34,17 @@ export async function POST(request: NextRequest) {
     
     console.log(`API: Conversation length: ${conversation.length} characters`);
     
-    if (!staffName) {
-      console.error('API: Missing staffName in request body');
-      return NextResponse.json(
-        { error: 'Missing staffName in request body' },
-        { status: 400 }
-      );
-    }
+    // Set default values for optional parameters
+    const staffNameToUse = staffName || 'Staff Member';
+    const dateToUse = date || new Date().toISOString().split('T')[0];
+    const modelToUse = model || 'claude';
     
-    if (!date) {
-      console.error('API: Missing date in request body');
-      return NextResponse.json(
-        { error: 'Missing date in request body' },
-        { status: 400 }
-      );
-    }
+    console.log(`API: Using staffName: ${staffNameToUse}`);
+    console.log(`API: Using date: ${dateToUse}`);
+    console.log(`API: Using model: ${modelToUse}`);
     
     // Check if we have the required API keys
-    if (model === 'gemini' && !process.env.GEMINI_API_KEY) {
+    if (modelToUse === 'gemini' && !process.env.GEMINI_API_KEY) {
       console.error('API: GEMINI_API_KEY environment variable is not set');
       return NextResponse.json(
         { error: 'GEMINI_API_KEY environment variable is not set' },
@@ -59,7 +52,7 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    if ((!model || model === 'claude') && !process.env.CLAUDE_API_KEY) {
+    if ((!modelToUse || modelToUse === 'claude') && !process.env.CLAUDE_API_KEY) {
       console.error('API: CLAUDE_API_KEY environment variable is not set');
       return NextResponse.json(
         { error: 'CLAUDE_API_KEY environment variable is not set' },
@@ -69,7 +62,7 @@ export async function POST(request: NextRequest) {
     
     let evaluation;
     
-    if (model === 'gemini') {
+    if (modelToUse === 'gemini') {
       console.log('API: Using Gemini model for evaluation');
       try {
         evaluation = await evaluateWithGemini(conversation, rubricId);
@@ -84,7 +77,7 @@ export async function POST(request: NextRequest) {
     } else {
       console.log('API: Using Claude model for evaluation');
       try {
-        evaluation = await evaluateConversationInChunks(conversation, staffName, date, rubricId);
+        evaluation = await evaluateConversationInChunks(conversation, staffNameToUse, dateToUse, rubricId);
         console.log('API: Claude evaluation completed successfully');
       } catch (error) {
         console.error('API: Error evaluating with Claude:', error);
