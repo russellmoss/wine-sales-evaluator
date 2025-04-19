@@ -171,7 +171,7 @@ const MarkdownImporter: FC<MarkdownImporterProps> = ({ onAnalysisComplete, isAna
           throw new Error(errorData.error || `API error: ${response.status} ${response.statusText}`);
         }
         
-        const result = await response.json();
+        const { jobId, result, message } = await response.json();
         
         if (!result) {
           throw new Error('No result returned from direct evaluation');
@@ -184,13 +184,14 @@ const MarkdownImporter: FC<MarkdownImporterProps> = ({ onAnalysisComplete, isAna
         }
         
         onAnalysisComplete(validationResult.data, markdown, fileName);
-        toast.success('Conversation analyzed successfully!');
+        toast.success(message || 'Conversation analyzed successfully!');
         
         if (fileInputRef.current) {
           fileInputRef.current.value = '';
         }
         setMarkdown(null);
         setFileName('');
+        setJobId(jobId);
         
         return;
       }

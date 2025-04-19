@@ -94,7 +94,12 @@ export async function POST(request: NextRequest) {
     }
     
     console.log('API: Returning evaluation result');
-    return NextResponse.json(evaluation);
+    // Always return a consistent response format
+    return NextResponse.json({
+      jobId: 'direct-' + Date.now(), // Generate a unique ID for direct evaluation
+      result: evaluation,
+      message: 'Evaluation completed successfully'
+    });
   } catch (error) {
     console.error('API: Unexpected error in analyze-conversation route:', error);
     return NextResponse.json(
