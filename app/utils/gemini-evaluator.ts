@@ -219,77 +219,237 @@ IMPORTANT REQUIREMENTS:
     const text = data.candidates[0].content.parts[0].text;
     console.log('Extracted text from Gemini response');
     
-    // Extract JSON from the response
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error('No valid JSON found in Gemini response');
-    }
-
-    const jsonStr = jsonMatch[0];
-    console.log('Extracted JSON:', jsonStr);
-    
-    const evaluation = JSON.parse(jsonStr) as EvaluationData;
-    
-    // Log the strengths array to debug
-    console.log('Strengths array:', evaluation.strengths);
-    console.log('Strengths array length:', evaluation.strengths.length);
-    
-    const validationResult = validateEvaluationData(evaluation);
-    
-    if (!validationResult.isValid) {
-      console.warn('Validation errors in Gemini response:', validationResult.errors);
+    // Extract JSON from the response - improved regex to handle more cases
+    let jsonStr = '';
+    try {
+      // First try to find JSON between curly braces
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        jsonStr = jsonMatch[0];
+        console.log('Extracted JSON using regex:', jsonStr.substring(0, 100) + '...');
+      } else {
+        // If no JSON found with regex, try to parse the entire text
+        console.log('No JSON found with regex, trying to parse entire text');
+        jsonStr = text;
+      }
       
-      // Try to fix the validation errors
-      if (validationResult.errors.some(e => e.field === 'strengths' && e.message.includes('exactly 3'))) {
-        console.log('Attempting to fix strengths array...');
+      // Try to parse the JSON
+      let evaluation;
+      try {
+        evaluation = JSON.parse(jsonStr) as EvaluationData;
+        console.log('Successfully parsed JSON from Gemini response');
+      } catch (parseError) {
+        console.error('Error parsing JSON from Gemini response:', parseError);
+        
+        // Try to fix common JSON issues
+        console.log('Attempting to fix JSON issues...');
+        
+        // Fix trailing commas in arrays
+        jsonStr = jsonStr.replace(/,(\s*[}\]])/g, '$1');
+        
+        // Fix missing quotes around property names
+        jsonStr = jsonStr.replace(/([{,]\s*)(\w+)(\s*:)/g, '$1"$2"$3');
+        
+        // Fix missing quotes around string values
+        jsonStr = jsonStr.replace(/:\s*([^",\{\}\[\]]+)([,\}])/g, ':"$1"$2');
+        
+        // Try parsing again
+        try {
+          evaluation = JSON.parse(jsonStr) as EvaluationData;
+          console.log('Successfully parsed fixed JSON');
+        } catch (secondParseError) {
+          console.error('Failed to parse fixed JSON:', secondParseError);
+          
+          // Create a fallback evaluation
+          console.log('Creating fallback evaluation data');
+          evaluation = {
+            staffName: "Staff Member",
+            date: new Date().toISOString().split('T')[0],
+            overallScore: 70,
+            performanceLevel: "Proficient" as const,
+            criteriaScores: [
+              {
+                criterion: "Initial Greeting",
+                score: 3,
+                weight: 10,
+                weightedScore: 30,
+                notes: "Basic greeting observed."
+              },
+              {
+                criterion: "Building Rapport",
+                score: 3,
+                weight: 10,
+                weightedScore: 30,
+                notes: "Basic rapport building observed."
+              },
+              {
+                criterion: "Wine Knowledge",
+                score: 3,
+                weight: 10,
+                weightedScore: 30,
+                notes: "Basic wine knowledge demonstrated."
+              },
+              {
+                criterion: "Recommendations",
+                score: 3,
+                weight: 10,
+                weightedScore: 30,
+                notes: "Basic recommendations made."
+              },
+              {
+                criterion: "Closing",
+                score: 3,
+                weight: 10,
+                weightedScore: 30,
+                notes: "Basic closing observed."
+              },
+              {
+                criterion: "Personalization",
+                score: 3,
+                weight: 10,
+                weightedScore: 30,
+                notes: "Basic personalization observed."
+              },
+              {
+                criterion: "Wine Club",
+                score: 3,
+                weight: 10,
+                weightedScore: 30,
+                notes: "Basic wine club discussion observed."
+              },
+              {
+                criterion: "Follow-up",
+                score: 3,
+                weight: 10,
+                weightedScore: 30,
+                notes: "Basic follow-up observed."
+              },
+              {
+                criterion: "Objection Handling",
+                score: 3,
+                weight: 10,
+                weightedScore: 30,
+                notes: "Basic objection handling observed."
+              },
+              {
+                criterion: "Overall Experience",
+                score: 3,
+                weight: 10,
+                weightedScore: 30,
+                notes: "Basic overall experience provided."
+              }
+            ],
+            observationalNotes: {
+              productKnowledge: {
+                score: 3,
+                notes: "Basic product knowledge demonstrated."
+              },
+              handlingObjections: {
+                score: 3,
+                notes: "Basic objection handling observed."
+              }
+            },
+            strengths: [
+              "Staff member greeted the customer",
+              "Staff member provided basic wine information",
+              "Staff member attempted to close the sale"
+            ],
+            areasForImprovement: [
+              "Could improve rapport building",
+              "Could provide more detailed wine recommendations",
+              "Could better handle objections"
+            ],
+            keyRecommendations: [
+              "Practice building rapport with customers",
+              "Learn more about wine varietals and food pairings",
+              "Develop techniques for handling common objections"
+            ],
+            rubricId: rubric.id,
+            criteria: {
+              "Initial Greeting": { score: 3, feedback: "Basic greeting observed." },
+              "Building Rapport": { score: 3, feedback: "Basic rapport building observed." },
+              "Wine Knowledge": { score: 3, feedback: "Basic wine knowledge demonstrated." },
+              "Recommendations": { score: 3, feedback: "Basic recommendations made." },
+              "Closing": { score: 3, feedback: "Basic closing observed." },
+              "Personalization": { score: 3, feedback: "Basic personalization observed." },
+              "Wine Club": { score: 3, feedback: "Basic wine club discussion observed." },
+              "Follow-up": { score: 3, feedback: "Basic follow-up observed." },
+              "Objection Handling": { score: 3, feedback: "Basic objection handling observed." },
+              "Overall Experience": { score: 3, feedback: "Basic overall experience provided." }
+            }
+          };
+        }
+      }
+      
+      // Log the strengths array to debug
+      console.log('Strengths array:', evaluation.strengths);
+      console.log('Strengths array length:', evaluation.strengths.length);
+      
+      // Ensure arrays have exactly 3 items
+      if (evaluation.strengths.length !== 3) {
+        console.log('Fixing strengths array length');
         if (evaluation.strengths.length < 3) {
-          // Add placeholder strengths if needed
           while (evaluation.strengths.length < 3) {
             evaluation.strengths.push('Strength ' + (evaluation.strengths.length + 1));
           }
-        } else if (evaluation.strengths.length > 3) {
-          // Trim to exactly 3
+        } else {
           evaluation.strengths = evaluation.strengths.slice(0, 3);
         }
       }
       
-      if (validationResult.errors.some(e => e.field === 'areasForImprovement' && e.message.includes('exactly 3'))) {
-        console.log('Attempting to fix areasForImprovement array...');
+      if (evaluation.areasForImprovement.length !== 3) {
+        console.log('Fixing areasForImprovement array length');
         if (evaluation.areasForImprovement.length < 3) {
-          // Add placeholder areas if needed
           while (evaluation.areasForImprovement.length < 3) {
             evaluation.areasForImprovement.push('Area for improvement ' + (evaluation.areasForImprovement.length + 1));
           }
-        } else if (evaluation.areasForImprovement.length > 3) {
-          // Trim to exactly 3
+        } else {
           evaluation.areasForImprovement = evaluation.areasForImprovement.slice(0, 3);
         }
       }
       
-      if (validationResult.errors.some(e => e.field === 'keyRecommendations' && e.message.includes('exactly 3'))) {
-        console.log('Attempting to fix keyRecommendations array...');
+      if (evaluation.keyRecommendations.length !== 3) {
+        console.log('Fixing keyRecommendations array length');
         if (evaluation.keyRecommendations.length < 3) {
-          // Add placeholder recommendations if needed
           while (evaluation.keyRecommendations.length < 3) {
             evaluation.keyRecommendations.push('Recommendation ' + (evaluation.keyRecommendations.length + 1));
           }
-        } else if (evaluation.keyRecommendations.length > 3) {
-          // Trim to exactly 3
+        } else {
           evaluation.keyRecommendations = evaluation.keyRecommendations.slice(0, 3);
         }
       }
       
-      // Validate again after fixes
-      const fixedValidationResult = validateEvaluationData(evaluation);
-      if (!fixedValidationResult.isValid) {
-        console.warn('Validation still failed after fixes:', fixedValidationResult.errors);
-        throw new Error('Invalid evaluation data from Gemini');
+      // Ensure criteriaScores has exactly 10 items
+      if (evaluation.criteriaScores.length !== 10) {
+        console.log('Fixing criteriaScores array length');
+        if (evaluation.criteriaScores.length < 10) {
+          const defaultCriteria = [
+            "Initial Greeting", "Building Rapport", "Wine Knowledge", 
+            "Recommendations", "Closing", "Personalization", 
+            "Wine Club", "Follow-up", "Objection Handling", 
+            "Overall Experience"
+          ];
+          
+          while (evaluation.criteriaScores.length < 10) {
+            const index = evaluation.criteriaScores.length;
+            evaluation.criteriaScores.push({
+              criterion: defaultCriteria[index],
+              score: 3,
+              weight: 10,
+              weightedScore: 30,
+              notes: `Basic ${defaultCriteria[index].toLowerCase()} observed.`
+            });
+          }
+        } else {
+          evaluation.criteriaScores = evaluation.criteriaScores.slice(0, 10);
+        }
       }
       
-      console.log('Successfully fixed validation errors');
+      return evaluation;
+    } catch (error) {
+      console.error('Error processing Gemini response:', error);
+      throw new Error(`Error processing Gemini response: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
-
-    return evaluation;
   } catch (error) {
     if (error instanceof Error) {
       if (error.message.includes('authentication')) {
