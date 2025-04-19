@@ -32,16 +32,19 @@ export async function POST(request: NextRequest) {
     console.log('API: Request body model:', body.model);
     console.log('API: Request body directEvaluation:', body.directEvaluation);
     
-    const { markdown, fileName, rubricId, model = 'claude', directEvaluation } = body;
+    const { markdown, conversation, fileName, rubricId, model = 'claude', directEvaluation } = body;
+    
+    // Use either markdown or conversation field
+    const contentToAnalyze = markdown || conversation;
     
     console.log(`API: Analyzing conversation with model: ${model}`);
-    console.log(`API: Markdown content length: ${markdown ? markdown.length : 0}`);
+    console.log(`API: Content length: ${contentToAnalyze ? contentToAnalyze.length : 0}`);
     console.log(`API: File name: ${fileName}`);
     console.log(`API: Rubric ID: ${rubricId}`);
     console.log(`API: Direct evaluation: ${directEvaluation}`);
     
-    if (!markdown) {
-      console.error('API: No markdown content provided in request');
+    if (!contentToAnalyze) {
+      console.error('API: No content provided in request');
       return NextResponse.json({ error: 'No markdown content provided' }, { status: 400 });
     }
     
@@ -61,7 +64,7 @@ export async function POST(request: NextRequest) {
         }
         
         console.log('API: Using Gemini model for evaluation');
-        const result = await evaluateWithGemini(markdown, rubricId);
+        const result = await evaluateWithGemini(contentToAnalyze, rubricId);
         return NextResponse.json({
           jobId: Date.now().toString(),
           result,
@@ -70,7 +73,7 @@ export async function POST(request: NextRequest) {
       } else {
         // Handle Claude evaluation here
         console.log('API: Using Claude model for evaluation');
-        const result = await evaluateConversationInChunks(markdown, rubricId);
+        const result = await evaluateConversationInChunks(contentToAnalyze, rubricId);
         return NextResponse.json({
           jobId: Date.now().toString(),
           result,
@@ -84,11 +87,11 @@ export async function POST(request: NextRequest) {
       console.log('API: Using markdown field for conversation');
     }
     
-    const { conversation, staffName, date } = { conversation: markdown, staffName: 'Staff Member', date: new Date().toISOString().split('T')[0] };
+    const { conversation: conversationFromBody, staffName, date } = { conversation: conversation, staffName: 'Staff Member', date: new Date().toISOString().split('T')[0] };
     
     console.log(`API: Analyzing conversation with model: ${model || 'claude'}`);
     
-    if (!conversation) {
+    if (!conversationFromBody) {
       console.error('API: Missing conversation in request body');
       return NextResponse.json(
         { error: 'Missing conversation in request body' },
@@ -96,7 +99,7 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    console.log(`API: Conversation length: ${conversation.length} characters`);
+    console.log(`API: Conversation length: ${conversationFromBody.length} characters`);
     
     // Set default values for optional parameters
     const staffNameToUse = staffName || 'Staff Member';
@@ -140,7 +143,7 @@ export async function POST(request: NextRequest) {
     if (modelToUse === 'gemini') {
       console.log('API: Using Gemini model for evaluation');
       try {
-        evaluation = await evaluateWithGemini(conversation, rubricId);
+        evaluation = await evaluateWithGemini(conversationFromBody, rubricId);
         console.log('API: Gemini evaluation completed successfully');
       } catch (error) {
         console.error('API: Error evaluating with Gemini:', error);
@@ -152,7 +155,7 @@ export async function POST(request: NextRequest) {
     } else {
       console.log('API: Using Claude model for evaluation');
       try {
-        evaluation = await evaluateConversationInChunks(conversation, staffNameToUse, dateToUse, rubricId);
+        evaluation = await evaluateConversationInChunks(conversationFromBody, staffNameToUse, dateToUse, rubricId);
         console.log('API: Claude evaluation completed successfully');
       } catch (error) {
         console.error('API: Error evaluating with Claude:', error);
