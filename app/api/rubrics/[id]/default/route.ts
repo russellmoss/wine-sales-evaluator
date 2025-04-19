@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getStorageProvider } from '@/app/utils/storage';
 
+// Specify Node.js runtime
+export const runtime = 'nodejs';
+
 // PUT /api/rubrics/:id/default - Set a rubric as default
 export async function PUT(
   request: NextRequest,
