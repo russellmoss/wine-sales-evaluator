@@ -1,4 +1,3 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { EvaluationData, validateEvaluationData } from '../types/evaluation';
 import { RubricApi } from './rubric-api';
 
@@ -13,8 +12,12 @@ async function listAvailableModels() {
       return null;
     }
     
+    // Log the first few characters of the API key for debugging
+    const apiKeyPreview = process.env.GEMINI_API_KEY.substring(0, 10) + '...';
+    console.log(`Using Gemini API key: ${apiKeyPreview}`);
+    
     // Use the fetch API to directly call the models endpoint with proper authentication
-    const response = await fetch('https://generativelanguage.googleapis.com/v1/models', {
+    const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models', {
       headers: {
         'Authorization': `Bearer ${process.env.GEMINI_API_KEY}`
       }
@@ -48,6 +51,10 @@ export async function evaluateWithGemini(
     throw new Error('GEMINI_API_KEY environment variable is not set');
   }
 
+  // Log the first few characters of the API key for debugging
+  const apiKeyPreview = process.env.GEMINI_API_KEY.substring(0, 10) + '...';
+  console.log(`Using Gemini API key: ${apiKeyPreview}`);
+
   // Load the rubric
   let rubric = null;
   if (rubricId) {
@@ -64,27 +71,7 @@ export async function evaluateWithGemini(
     }
   }
 
-  // Initialize the Gemini API with proper error handling
-  let genAI;
-  try {
-    genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    console.log('Gemini API initialized successfully');
-  } catch (error) {
-    console.error('Error initializing Gemini API:', error);
-    throw new Error('Failed to initialize Gemini API. Please check your API key.');
-  }
-
-  // Use the correct model name and configuration
-  const model = genAI.getGenerativeModel({ 
-    model: "gemini-pro",
-    generationConfig: {
-      temperature: 0.2, // Lower temperature for more consistent evaluations
-      topK: 40,
-      topP: 0.95,
-      maxOutputTokens: 4096, // Increased token limit for more detailed responses
-    }
-  });
-
+  // Create the prompt
   const prompt = `You are a General Manager of a prestigious winery with over 15 years of experience in wine sales and hospitality. You are evaluating a sales conversation between one of your staff members and a customer. Your goal is to provide detailed, constructive feedback to help your staff member improve their wine sales skills.
 
 Please carefully evaluate this conversation using the following rubric:
@@ -154,12 +141,83 @@ IMPORTANT REQUIREMENTS:
 
   try {
     console.log('Sending request to Gemini API...');
-    const result = await model.generateContent(prompt);
-    console.log('Received response from Gemini API');
-    const response = await result.response;
-    const text = response.text();
     
-    console.log('Raw Gemini response:', text);
+    // First, call the ListModels API to check available models
+    console.log('Calling ListModels API...');
+    const listModelsUrl = `https://generativelanguage.googleapis.com/v1/models?key=${process.env.GEMINI_API_KEY}`;
+    console.log('ListModels URL:', listModelsUrl);
+
+    try {
+      const listModelsResponse = await fetch(listModelsUrl, {
+        method: 'GET',
+      });
+
+      if (!listModelsResponse.ok) {
+        const errorText = await listModelsResponse.text();
+        console.error('ListModels API error:', errorText);
+        console.error(`Response status: ${listModelsResponse.status}, statusText: ${listModelsResponse.statusText}`);
+        console.error('Response headers:', JSON.stringify(Object.fromEntries([...listModelsResponse.headers]), null, 2));
+        throw new Error(`ListModels API error: ${listModelsResponse.status} ${listModelsResponse.statusText} - ${errorText}`);
+      }
+
+      const listModelsData = await listModelsResponse.json();
+      console.log('ListModels API Response:', JSON.stringify(listModelsData, null, 2));
+      console.log('Available Models:', listModelsData.models);
+
+    } catch (error) {
+      console.error('Error calling ListModels API:', error);
+      // Continue with generateContent even if ListModels fails
+    }
+    
+    // Now proceed with the generateContent call
+    // Log the request details for debugging
+    const requestUrl = 'https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro-001:generateContent';
+    console.log(`Request URL: ${requestUrl}`);
+    console.log('Using Gemini model:', 'models/gemini-1.5-pro-001');
+    
+    // Log the complete URL including API key
+    console.log('Full Gemini API URL:', `${requestUrl}?key=${process.env.GEMINI_API_KEY}`);
+    
+    // Use the fetch API to directly call the Gemini API with API key in the URL
+    const response = await fetch(`${requestUrl}?key=${process.env.GEMINI_API_KEY}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              {
+                text: prompt
+              }
+            ]
+          }
+        ],
+        generationConfig: {
+          temperature: 0.2,
+          topK: 40,
+          topP: 0.95,
+          maxOutputTokens: 4096
+        }
+      })
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Gemini API error response:', errorText);
+      console.error(`Response status: ${response.status}, statusText: ${response.statusText}`);
+      console.error('Response headers:', JSON.stringify(Object.fromEntries([...response.headers]), null, 2));
+      throw new Error(`Gemini API error: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+    
+    console.log('Received response from Gemini API');
+    const data = await response.json();
+    console.log('Raw Gemini response:', JSON.stringify(data, null, 2));
+    
+    // Extract the text from the response
+    const text = data.candidates[0].content.parts[0].text;
+    console.log('Extracted text from Gemini response');
     
     // Extract JSON from the response
     const jsonMatch = text.match(/\{[\s\S]*\}/);
