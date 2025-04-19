@@ -3,6 +3,8 @@ import { getStorageProvider } from '@/app/utils/storage';
 import { validateRubric } from '@/app/types/rubric';
 import { v4 as uuidv4 } from 'uuid';
 
+export const runtime = 'nodejs';
+
 // GET /api/rubrics - List all rubrics
 export async function GET(request: NextRequest) {
   try {

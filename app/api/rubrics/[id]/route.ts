@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getStorageProvider } from '@/app/utils/storage';
 import { validateRubric } from '@/app/types/rubric';
 
+export const runtime = 'nodejs';
+
 // GET /api/rubrics/:id - Get a specific rubric
 export async function GET(
   request: NextRequest,
