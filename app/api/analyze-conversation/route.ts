@@ -55,13 +55,19 @@ export async function POST(request: NextRequest) {
       
       // Skip the validation step and just log that we're using the API key
       console.log('API: Using Gemini API key for evaluation');
-    }
-    
-    if (modelToUse === 'claude' && !process.env.CLAUDE_API_KEY) {
-      console.error('API: CLAUDE_API_KEY environment variable is not set');
+    } else if (modelToUse === 'claude') {
+      if (!process.env.CLAUDE_API_KEY) {
+        console.error('API: CLAUDE_API_KEY environment variable is not set');
+        return NextResponse.json(
+          { error: 'CLAUDE_API_KEY environment variable is not set' },
+          { status: 500 }
+        );
+      }
+    } else {
+      console.error('API: Invalid model selected:', modelToUse);
       return NextResponse.json(
-        { error: 'CLAUDE_API_KEY environment variable is not set' },
-        { status: 500 }
+        { error: 'Invalid model selected. Must be either "claude" or "gemini".' },
+        { status: 400 }
       );
     }
     
@@ -97,8 +103,11 @@ export async function POST(request: NextRequest) {
     // Always return a consistent response format
     return NextResponse.json({
       jobId: 'direct-' + Date.now(), // Generate a unique ID for direct evaluation
-      result: evaluation,
-      message: 'Evaluation completed successfully'
+      result: {
+        ...evaluation,
+        model: modelToUse // Include the model used in the response
+      },
+      message: `Evaluation completed successfully using ${modelToUse}`
     });
   } catch (error) {
     console.error('API: Unexpected error in analyze-conversation route:', error);

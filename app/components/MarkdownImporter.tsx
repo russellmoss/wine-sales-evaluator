@@ -177,14 +177,20 @@ const MarkdownImporter: FC<MarkdownImporterProps> = ({ onAnalysisComplete, isAna
           throw new Error('No result returned from direct evaluation');
         }
         
-        const validationResult = validateEvaluationData(result);
+        // Add model information to the result
+        const resultWithModel = {
+          ...result,
+          model: selectedModel
+        };
+        
+        const validationResult = validateEvaluationData(resultWithModel);
         if (!validationResult.isValid) {
           console.warn('Validation issues found:', validationResult.errors);
           toast.error('The evaluation data has some issues, but we\'ll try to use it anyway');
         }
         
         onAnalysisComplete(validationResult.data, markdown, fileName);
-        toast.success(message || 'Conversation analyzed successfully!');
+        toast.success(`${selectedModel === 'gemini' ? 'Gemini' : 'Claude'} evaluation completed successfully!`);
         
         if (fileInputRef.current) {
           fileInputRef.current.value = '';
