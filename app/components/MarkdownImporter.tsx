@@ -148,6 +148,7 @@ const MarkdownImporter: FC<MarkdownImporterProps> = ({ onAnalysisComplete, isAna
       
       if (useDirectEvaluation) {
         console.log('Using direct evaluation mode with rubric:', selectedRubricId);
+        console.log('Using model:', selectedModel);
         toast('Using direct evaluation mode');
         
         const response = await fetch('/api/analyze-conversation', {
@@ -156,9 +157,9 @@ const MarkdownImporter: FC<MarkdownImporterProps> = ({ onAnalysisComplete, isAna
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            markdown: markdown,
-            fileName: fileName,
-            directEvaluation: true,
+            conversation: markdown,
+            staffName: 'Staff Member',
+            date: new Date().toISOString().split('T')[0],
             rubricId: selectedRubricId || undefined,
             model: selectedModel
           }),
@@ -166,10 +167,11 @@ const MarkdownImporter: FC<MarkdownImporterProps> = ({ onAnalysisComplete, isAna
         
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+          console.error('API error response:', errorData);
           throw new Error(errorData.error || `API error: ${response.status} ${response.statusText}`);
         }
         
-        const { result } = await response.json();
+        const result = await response.json();
         
         if (!result) {
           throw new Error('No result returned from direct evaluation');

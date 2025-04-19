@@ -12,10 +12,17 @@ export async function POST(request: NextRequest) {
   
   try {
     const body = await request.json();
+    console.log('API: Request body:', JSON.stringify(body, null, 2));
+    
+    // Check if we have a markdown field (for backward compatibility)
+    if (body.markdown) {
+      console.log('API: Using markdown field for conversation');
+      body.conversation = body.markdown;
+    }
+    
     const { conversation, staffName, date, rubricId, model } = body;
     
     console.log(`API: Analyzing conversation with model: ${model || 'claude'}`);
-    console.log(`API: Conversation length: ${conversation.length} characters`);
     
     if (!conversation) {
       console.error('API: Missing conversation in request body');
@@ -24,6 +31,8 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+    
+    console.log(`API: Conversation length: ${conversation.length} characters`);
     
     if (!staffName) {
       console.error('API: Missing staffName in request body');
