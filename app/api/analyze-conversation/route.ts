@@ -11,27 +11,56 @@ export async function POST(request: NextRequest) {
   console.log('API: analyze-conversation route called');
   
   try {
-    const { markdown, fileName, rubricId, model = 'claude', directEvaluation } = await request.json();
+    // Log request headers
+    console.log('API: Request headers:', JSON.stringify(Object.fromEntries(request.headers.entries()), null, 2));
     
-    console.log(`Analyzing conversation with model: ${model}`);
+    // Parse request body
+    let body;
+    try {
+      body = await request.json();
+      console.log('API: Request body parsed successfully');
+    } catch (error) {
+      console.error('API: Error parsing request body:', error);
+      return NextResponse.json({ error: 'Invalid JSON in request body' }, { status: 400 });
+    }
+    
+    // Log request body keys and content length
+    console.log('API: Request body keys:', Object.keys(body));
+    console.log('API: Request body markdown length:', body.markdown ? body.markdown.length : 0);
+    console.log('API: Request body fileName:', body.fileName);
+    console.log('API: Request body rubricId:', body.rubricId);
+    console.log('API: Request body model:', body.model);
+    console.log('API: Request body directEvaluation:', body.directEvaluation);
+    
+    const { markdown, fileName, rubricId, model = 'claude', directEvaluation } = body;
+    
+    console.log(`API: Analyzing conversation with model: ${model}`);
+    console.log(`API: Markdown content length: ${markdown ? markdown.length : 0}`);
+    console.log(`API: File name: ${fileName}`);
+    console.log(`API: Rubric ID: ${rubricId}`);
+    console.log(`API: Direct evaluation: ${directEvaluation}`);
     
     if (!markdown) {
+      console.error('API: No markdown content provided in request');
       return NextResponse.json({ error: 'No markdown content provided' }, { status: 400 });
     }
     
     if (!fileName) {
+      console.error('API: No file name provided in request');
       return NextResponse.json({ error: 'No file name provided' }, { status: 400 });
     }
     
     // If direct evaluation is requested, evaluate directly without storing in file system
     if (directEvaluation) {
-      console.log('Performing direct evaluation...');
+      console.log('API: Performing direct evaluation...');
       
       if (model === 'gemini') {
         if (!process.env.GEMINI_API_KEY) {
+          console.error('API: GEMINI_API_KEY environment variable is not set');
           return NextResponse.json({ error: 'GEMINI_API_KEY environment variable is not set' }, { status: 500 });
         }
         
+        console.log('API: Using Gemini model for evaluation');
         const result = await evaluateWithGemini(markdown, rubricId);
         return NextResponse.json({
           jobId: Date.now().toString(),
@@ -40,6 +69,7 @@ export async function POST(request: NextRequest) {
         });
       } else {
         // Handle Claude evaluation here
+        console.log('API: Using Claude model for evaluation');
         const result = await evaluateConversationInChunks(markdown, rubricId);
         return NextResponse.json({
           jobId: Date.now().toString(),

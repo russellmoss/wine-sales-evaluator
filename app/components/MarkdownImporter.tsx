@@ -69,14 +69,33 @@ const MarkdownImporter: FC<MarkdownImporterProps> = ({ onAnalysisComplete, isAna
     const file = event.target.files?.[0];
     if (!file) return;
 
+    console.log('MarkdownImporter: File selected:', file.name, 'Size:', file.size, 'bytes');
     setFileName(file.name);
+    
     const reader = new FileReader();
     reader.onload = (e) => {
       const content = e.target?.result as string;
+      console.log('MarkdownImporter: File content loaded, length:', content.length);
+      console.log('MarkdownImporter: First 100 chars of content:', content.substring(0, 100));
       setMarkdown(content);
     };
+    
+    reader.onerror = (error) => {
+      console.error('MarkdownImporter: Error reading file:', error);
+      toast.error('Error reading file. Please try again.');
+    };
+    
     reader.readAsText(file);
   };
+
+  // Add a useEffect to log when markdown state changes
+  useEffect(() => {
+    if (markdown) {
+      console.log('MarkdownImporter: Markdown state updated, length:', markdown.length);
+    } else {
+      console.log('MarkdownImporter: Markdown state is null');
+    }
+  }, [markdown]);
 
   const handleCleanup = async () => {
     if (!markdown) {
@@ -143,26 +162,37 @@ const MarkdownImporter: FC<MarkdownImporterProps> = ({ onAnalysisComplete, isAna
       setError(null);
       setJobId(null);
 
+      console.log('MarkdownImporter: Starting analysis with markdown length:', markdown.length);
+      console.log('MarkdownImporter: File name:', fileName);
+      console.log('MarkdownImporter: Selected rubric ID:', selectedRubricId);
+      console.log('MarkdownImporter: Selected model:', selectedModel);
+
       const useDirectEvaluation = process.env.NEXT_PUBLIC_USE_DIRECT_EVALUATION === 'true' || 
                                   process.env.NODE_ENV === 'development';
       
       if (useDirectEvaluation) {
-        console.log('Using direct evaluation mode with rubric:', selectedRubricId);
-        console.log('Using model:', selectedModel);
+        console.log('MarkdownImporter: Using direct evaluation mode with rubric:', selectedRubricId);
+        console.log('MarkdownImporter: Using model:', selectedModel);
         toast('Using direct evaluation mode');
+        
+        const requestBody = {
+          markdown: markdown,
+          fileName: fileName,
+          rubricId: selectedRubricId || undefined,
+          model: selectedModel,
+          directEvaluation: true
+        };
+        
+        console.log('MarkdownImporter: Request body keys:', Object.keys(requestBody));
+        console.log('MarkdownImporter: Request body markdown length:', requestBody.markdown ? requestBody.markdown.length : 0);
+        console.log('MarkdownImporter: Request body fileName:', requestBody.fileName);
         
         const response = await fetch('/api/analyze-conversation', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            markdown: markdown,
-            fileName: fileName,
-            rubricId: selectedRubricId || undefined,
-            model: selectedModel,
-            directEvaluation: true
-          }),
+          body: JSON.stringify(requestBody),
         });
         
         if (!response.ok) {
