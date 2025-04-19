@@ -180,7 +180,7 @@ const MarkdownImporter: FC<MarkdownImporterProps> = ({ onAnalysisComplete, isAna
           fileName,
           jobId,
           rubricId: selectedRubricId,
-          model: 'gemini'
+          model: selectedModel
         }),
       });
 
