@@ -137,7 +137,9 @@ IMPORTANT REQUIREMENTS:
 15. For each criterion, include specific examples and references to parts of the conversation`;
 
   try {
+    console.log('Sending request to Gemini API...');
     const result = await model.generateContent(prompt);
+    console.log('Received response from Gemini API');
     const response = await result.response;
     const text = response.text();
     
@@ -217,13 +219,17 @@ IMPORTANT REQUIREMENTS:
   } catch (error) {
     if (error instanceof Error) {
       if (error.message.includes('authentication')) {
+        console.error('Authentication error with Gemini API:', error);
         throw new Error('Authentication failed with Gemini API. Please check your GEMINI_API_KEY.');
       }
       if (error.message.includes('rate limit')) {
+        console.error('Rate limit error with Gemini API:', error);
         throw new Error('Rate limit exceeded with Gemini API. Please try again later.');
       }
+      console.error('Error analyzing with Gemini:', error);
+      throw new Error(`Error analyzing with Gemini: ${error.message}`);
     }
-    console.error('Error analyzing with Gemini:', error);
-    throw error;
+    console.error('Unknown error analyzing with Gemini:', error);
+    throw new Error('Unknown error analyzing with Gemini');
   }
 } 
