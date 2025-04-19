@@ -157,11 +157,11 @@ const MarkdownImporter: FC<MarkdownImporterProps> = ({ onAnalysisComplete, isAna
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            conversation: markdown,
-            staffName: 'Staff Member',
-            date: new Date().toISOString().split('T')[0],
+            markdown: markdown,
+            fileName: fileName,
             rubricId: selectedRubricId || undefined,
-            model: selectedModel
+            model: selectedModel,
+            directEvaluation: true
           }),
         });
         

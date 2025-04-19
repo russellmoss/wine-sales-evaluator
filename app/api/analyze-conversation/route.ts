@@ -11,16 +11,50 @@ export async function POST(request: NextRequest) {
   console.log('API: analyze-conversation route called');
   
   try {
-    const body = await request.json();
-    console.log('API: Request body:', JSON.stringify(body, null, 2));
+    const { markdown, fileName, rubricId, model = 'claude', directEvaluation } = await request.json();
     
-    // Check if we have a markdown field (for backward compatibility)
-    if (body.markdown) {
-      console.log('API: Using markdown field for conversation');
-      body.conversation = body.markdown;
+    console.log(`Analyzing conversation with model: ${model}`);
+    
+    if (!markdown) {
+      return NextResponse.json({ error: 'No markdown content provided' }, { status: 400 });
     }
     
-    const { conversation, staffName, date, rubricId, model } = body;
+    if (!fileName) {
+      return NextResponse.json({ error: 'No file name provided' }, { status: 400 });
+    }
+    
+    // If direct evaluation is requested, evaluate directly without storing in file system
+    if (directEvaluation) {
+      console.log('Performing direct evaluation...');
+      
+      if (model === 'gemini') {
+        if (!process.env.GEMINI_API_KEY) {
+          return NextResponse.json({ error: 'GEMINI_API_KEY environment variable is not set' }, { status: 500 });
+        }
+        
+        const result = await evaluateWithGemini(markdown, rubricId);
+        return NextResponse.json({
+          jobId: Date.now().toString(),
+          result,
+          model: 'gemini'
+        });
+      } else {
+        // Handle Claude evaluation here
+        const result = await evaluateConversationInChunks(markdown, rubricId);
+        return NextResponse.json({
+          jobId: Date.now().toString(),
+          result,
+          model: 'claude'
+        });
+      }
+    }
+    
+    // Check if we have a markdown field (for backward compatibility)
+    if (markdown) {
+      console.log('API: Using markdown field for conversation');
+    }
+    
+    const { conversation, staffName, date } = { conversation: markdown, staffName: 'Staff Member', date: new Date().toISOString().split('T')[0] };
     
     console.log(`API: Analyzing conversation with model: ${model || 'claude'}`);
     
