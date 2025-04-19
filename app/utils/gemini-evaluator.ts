@@ -37,10 +37,8 @@ async function listAvailableModels() {
   }
 }
 
-// Call the function to list models when the module is loaded
-listAvailableModels().catch(error => {
-  console.error('Failed to list models:', error);
-});
+// Remove the automatic call to listAvailableModels
+// This was causing 401 errors even when using Claude
 
 export async function evaluateWithGemini(
   conversation: string,
