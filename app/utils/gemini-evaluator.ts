@@ -2,13 +2,17 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { EvaluationData, validateEvaluationData } from '../types/evaluation';
 import { RubricApi } from './rubric-api';
 
-// Initialize with API key
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
-
 // Function to list available models
 async function listAvailableModels() {
   try {
     console.log('Listing available models...');
+    
+    // Check if API key is set
+    if (!process.env.GEMINI_API_KEY) {
+      console.error('GEMINI_API_KEY environment variable is not set');
+      return null;
+    }
+    
     // Use the fetch API to directly call the models endpoint with proper authentication
     const response = await fetch('https://generativelanguage.googleapis.com/v1/models', {
       headers: {
@@ -17,6 +21,10 @@ async function listAvailableModels() {
     });
     
     if (!response.ok) {
+      if (response.status === 401) {
+        console.error('Authentication failed with Gemini API. Please check your GEMINI_API_KEY.');
+        return null;
+      }
       throw new Error(`Failed to list models: ${response.status} ${response.statusText}`);
     }
     
@@ -25,7 +33,7 @@ async function listAvailableModels() {
     return data;
   } catch (error) {
     console.error('Error listing models:', error);
-    throw error;
+    return null;
   }
 }
 
@@ -56,6 +64,16 @@ export async function evaluateWithGemini(
     if (!rubric) {
       throw new Error('No rubric found for evaluation');
     }
+  }
+
+  // Initialize the Gemini API with proper error handling
+  let genAI;
+  try {
+    genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    console.log('Gemini API initialized successfully');
+  } catch (error) {
+    console.error('Error initializing Gemini API:', error);
+    throw new Error('Failed to initialize Gemini API. Please check your API key.');
   }
 
   // Use the correct model name and configuration

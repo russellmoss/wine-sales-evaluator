@@ -44,12 +44,39 @@ export async function POST(request: NextRequest) {
     console.log(`API: Using model: ${modelToUse}`);
     
     // Check if we have the required API keys
-    if (modelToUse === 'gemini' && !process.env.GEMINI_API_KEY) {
-      console.error('API: GEMINI_API_KEY environment variable is not set');
-      return NextResponse.json(
-        { error: 'GEMINI_API_KEY environment variable is not set' },
-        { status: 500 }
-      );
+    if (modelToUse === 'gemini') {
+      if (!process.env.GEMINI_API_KEY) {
+        console.error('API: GEMINI_API_KEY environment variable is not set');
+        return NextResponse.json(
+          { error: 'GEMINI_API_KEY environment variable is not set' },
+          { status: 500 }
+        );
+      }
+      
+      // Test the Gemini API key
+      try {
+        const response = await fetch('https://generativelanguage.googleapis.com/v1/models', {
+          headers: {
+            'Authorization': `Bearer ${process.env.GEMINI_API_KEY}`
+          }
+        });
+        
+        if (!response.ok) {
+          console.error(`API: Gemini API key validation failed: ${response.status} ${response.statusText}`);
+          return NextResponse.json(
+            { error: 'Invalid GEMINI_API_KEY. Please check your API key.' },
+            { status: 500 }
+          );
+        }
+        
+        console.log('API: Gemini API key validated successfully');
+      } catch (error) {
+        console.error('API: Error validating Gemini API key:', error);
+        return NextResponse.json(
+          { error: 'Error validating GEMINI_API_KEY. Please check your API key.' },
+          { status: 500 }
+        );
+      }
     }
     
     if ((!modelToUse || modelToUse === 'claude') && !process.env.CLAUDE_API_KEY) {
