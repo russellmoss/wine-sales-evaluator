@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
     // Set default values for optional parameters
     const staffNameToUse = staffName || 'Staff Member';
     const dateToUse = date || new Date().toISOString().split('T')[0];
-    const modelToUse = model || 'claude';
+    const modelToUse = model?.toLowerCase() || 'claude';
     
     console.log(`API: Using staffName: ${staffNameToUse}`);
     console.log(`API: Using date: ${dateToUse}`);
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
       console.log('API: Using Gemini API key for evaluation');
     }
     
-    if ((!modelToUse || modelToUse === 'claude') && !process.env.CLAUDE_API_KEY) {
+    if (modelToUse === 'claude' && !process.env.CLAUDE_API_KEY) {
       console.error('API: CLAUDE_API_KEY environment variable is not set');
       return NextResponse.json(
         { error: 'CLAUDE_API_KEY environment variable is not set' },
