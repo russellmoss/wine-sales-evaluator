@@ -6,13 +6,18 @@ import { RubricScorer } from '@/app/components/RubricScorer';
 import { RubricApi } from '@/app/utils/rubric-api';
 import { Rubric } from '@/app/types/rubric';
 import { Button } from '@/app/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
 import { marked } from 'marked';
 
-// Configure marked to preserve line breaks
+// Configure marked to preserve line breaks and add custom renderer for paragraphs
 marked.setOptions({
   breaks: true,
-  gfm: true
+  gfm: true,
+  renderer: new marked.Renderer({
+    paragraph(text) {
+      return `<p class="mb-4">${text}</p>`;
+    }
+  })
 });
 
 // Make the page dynamic to prevent static generation issues
@@ -27,6 +32,7 @@ function ManualAnalysisContent() {
   const [loading, setLoading] = useState(true);
   const [conversationSummary, setConversationSummary] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   useEffect(() => {
     const loadRubric = async () => {
@@ -160,27 +166,56 @@ function ManualAnalysisContent() {
   }
 
   return (
-    <div className="p-4">
-      <div className="mb-4">
-        <Button 
-          onClick={() => router.back()}
-          className="flex items-center"
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Go Back
-        </Button>
-      </div>
-      
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold mb-2">Manual Analysis</h1>
-        <div className="prose max-w-none" dangerouslySetInnerHTML={{ __html: conversationSummary }} />
+    <div className="relative min-h-screen">
+      {/* Main content */}
+      <div className="p-4">
+        <div className="flex items-center justify-between mb-4">
+          <Button 
+            onClick={() => router.back()}
+            className="flex items-center"
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Go Back
+          </Button>
+        </div>
+        
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold mb-2">Manual Analysis</h1>
+          <div className="prose max-w-none [&>p]:mb-4 [&>p:last-child]:mb-0" dangerouslySetInnerHTML={{ __html: conversationSummary }} />
+        </div>
       </div>
 
-      <RubricScorer 
-        rubric={rubric}
-        conversationId={conversationId || ''}
-        conversationSummary={conversationSummary}
-      />
+      {/* Sliding panel */}
+      <div 
+        className={`fixed right-0 top-0 h-screen transition-all duration-300 ease-in-out ${
+          isSidebarOpen ? 'w-1/2' : 'w-12'
+        }`}
+      >
+        {/* Toggle button */}
+        <button
+          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+          className={`absolute left-0 top-1/2 -translate-y-1/2 bg-white border border-gray-200 rounded-l-lg p-2 shadow-md z-10 ${
+            isSidebarOpen ? 'rotate-180' : ''
+          }`}
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
+
+        {/* Panel content */}
+        <div className={`h-full bg-white border-l shadow-lg overflow-y-auto ${
+          isSidebarOpen ? 'opacity-100' : 'opacity-0'
+        }`}>
+          {isSidebarOpen && (
+            <div className="p-4">
+              <RubricScorer 
+                rubric={rubric}
+                conversationId={conversationId || ''}
+                conversationSummary={conversationSummary}
+              />
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
