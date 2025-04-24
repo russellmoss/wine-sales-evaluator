@@ -15,6 +15,9 @@ marked.setOptions({
   gfm: true
 });
 
+// Make the page dynamic to prevent static generation issues
+export const dynamic = 'force-dynamic';
+
 export default function ManualAnalysisPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -23,6 +26,7 @@ export default function ManualAnalysisPage() {
   const [rubric, setRubric] = useState<Rubric | null>(null);
   const [loading, setLoading] = useState(true);
   const [conversationSummary, setConversationSummary] = useState<string>('');
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const loadRubric = async () => {
@@ -48,6 +52,7 @@ export default function ManualAnalysisPage() {
         }
       } catch (error) {
         console.error('Error loading rubric:', error);
+        setError('Failed to load rubric. Please try again.');
       } finally {
         setLoading(false);
       }
@@ -58,97 +63,122 @@ export default function ManualAnalysisPage() {
 
   useEffect(() => {
     const loadConversation = async () => {
-      // First try to get from sessionStorage
-      const storedMarkdown = sessionStorage.getItem('manualAnalysisMarkdown');
-      console.log('Stored markdown:', storedMarkdown);
-      
-      if (storedMarkdown) {
-        // Add extra line breaks between messages
-        const formattedMarkdown = storedMarkdown.replace(/\n\n/g, '\n\n\n');
-        const html = await marked(formattedMarkdown);
-        setConversationSummary(html);
-        return;
-      }
+      try {
+        // First try to get from sessionStorage
+        const storedMarkdown = sessionStorage.getItem('manualAnalysisMarkdown');
+        console.log('Stored markdown:', storedMarkdown);
+        
+        if (storedMarkdown) {
+          // Add extra line breaks between messages
+          const formattedMarkdown = storedMarkdown.replace(/\n\n/g, '\n\n\n');
+          const html = await marked(formattedMarkdown);
+          setConversationSummary(html);
+          return;
+        }
 
-      // If not in sessionStorage, try to get from localStorage
-      const localStorageMarkdown = localStorage.getItem('manualAnalysisMarkdown');
-      console.log('Local storage markdown:', localStorageMarkdown);
-      
-      if (localStorageMarkdown) {
-        // Add extra line breaks between messages
-        const formattedMarkdown = localStorageMarkdown.replace(/\n\n/g, '\n\n\n');
-        const html = await marked(formattedMarkdown);
-        setConversationSummary(html);
-        return;
-      }
+        // If not in sessionStorage, try to get from localStorage
+        const localStorageMarkdown = localStorage.getItem('manualAnalysisMarkdown');
+        console.log('Local storage markdown:', localStorageMarkdown);
+        
+        if (localStorageMarkdown) {
+          // Add extra line breaks between messages
+          const formattedMarkdown = localStorageMarkdown.replace(/\n\n/g, '\n\n\n');
+          const html = await marked(formattedMarkdown);
+          setConversationSummary(html);
+          return;
+        }
 
-      // If still not found, try to get from URL parameters
-      const urlMarkdown = searchParams.get('markdown');
-      console.log('URL markdown:', urlMarkdown);
-      
-      if (urlMarkdown) {
-        // Add extra line breaks between messages
-        const formattedMarkdown = urlMarkdown.replace(/\n\n/g, '\n\n\n');
-        const html = await marked(formattedMarkdown);
-        setConversationSummary(html);
-        return;
-      }
+        // If still not found, try to get from URL parameters
+        const urlMarkdown = searchParams.get('markdown');
+        console.log('URL markdown:', urlMarkdown);
+        
+        if (urlMarkdown) {
+          // Add extra line breaks between messages
+          const formattedMarkdown = urlMarkdown.replace(/\n\n/g, '\n\n\n');
+          const html = await marked(urlMarkdown);
+          setConversationSummary(html);
+          return;
+        }
 
-      console.log('No conversation found in any storage location');
+        console.log('No conversation found in any storage location');
+        setError('No conversation found. Please try again.');
+      } catch (error) {
+        console.error('Error loading conversation:', error);
+        setError('Failed to load conversation. Please try again.');
+      }
     };
 
     loadConversation();
   }, [searchParams]);
 
-  if (loading) {
+  if (error) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      <div className="p-4">
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+          <strong className="font-bold">Error: </strong>
+          <span className="block sm:inline">{error}</span>
+        </div>
+        <Button 
+          onClick={() => router.back()}
+          className="mt-4"
+        >
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Go Back
+        </Button>
       </div>
     );
   }
 
-  if (!rubric || !conversationSummary) {
+  if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen space-y-4">
-        <p className="text-lg text-gray-600">
-          {!rubric ? 'No rubric selected' : 'No conversation selected'}
-        </p>
+      <div className="p-4">
+        <div className="animate-pulse">
+          <div className="h-4 bg-gray-200 rounded w-3/4 mb-4"></div>
+          <div className="h-4 bg-gray-200 rounded w-1/2 mb-4"></div>
+          <div className="h-4 bg-gray-200 rounded w-2/3"></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!rubric) {
+    return (
+      <div className="p-4">
+        <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded relative" role="alert">
+          <strong className="font-bold">Warning: </strong>
+          <span className="block sm:inline">No rubric found. Please try again.</span>
+        </div>
         <Button 
-          onClick={() => router.push('/')}
-          className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white"
+          onClick={() => router.back()}
+          className="mt-4"
         >
-          <ArrowLeft className="h-4 w-4" />
-          <span>Back to Home</span>
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Go Back
         </Button>
       </div>
     );
   }
 
   return (
-    <div className="flex h-screen">
-      {/* Left side - Conversation content */}
-      <div className="w-1/2 p-6 overflow-y-auto bg-gray-50">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-2xl font-bold">Conversation Content</h2>
-          <Button 
-            onClick={() => router.push('/')}
-            className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            <span>Back to Home</span>
-          </Button>
-        </div>
-        <div 
-          className="prose max-w-none bg-white p-4 rounded-lg shadow whitespace-pre-wrap"
-          dangerouslySetInnerHTML={{ __html: conversationSummary }}
-        />
+    <div className="p-4">
+      <div className="mb-4">
+        <Button 
+          onClick={() => router.back()}
+          className="flex items-center"
+        >
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Go Back
+        </Button>
+      </div>
+      
+      <div className="mb-8">
+        <h1 className="text-2xl font-bold mb-2">Manual Analysis</h1>
+        <div className="prose max-w-none" dangerouslySetInnerHTML={{ __html: conversationSummary }} />
       </div>
 
-      {/* Right side - Rubric scorer */}
       <RubricScorer 
-        rubric={rubric} 
-        conversationId={conversationId || ''} 
+        rubric={rubric}
+        conversationId={conversationId || ''}
         conversationSummary={conversationSummary}
       />
     </div>
