@@ -3,27 +3,8 @@ import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { Rubric, createDefaultWineSalesRubric } from '../types/rubric';
 import { EvaluationData } from '../types/evaluation';
-import { JobResult } from '../types/job';
-
-// Define the job status interface
-export interface JobStatus {
-  id: string;
-  status: 'pending' | 'processing' | 'completed' | 'failed' | 'unknown' | 'api_error';
-  result?: JobResult;
-  error?: string;
-  errorDetails?: {
-    type: string;
-    message: string;
-    timestamp: string;
-    isTimeout?: boolean;
-  };
-  createdAt: string;
-  updatedAt: string;
-  expiresAt?: number; // Optional expiration timestamp
-  markdown?: string; // The markdown content to analyze
-  fileName?: string; // The name of the file being analyzed
-  rubricId?: string; // New field to track which rubric was used for evaluation
-}
+import { JobResult, JobStatus } from '../types/job';
+import { Evaluation } from '../types/evaluation';
 
 // Storage provider interface
 export interface StorageProvider {
@@ -41,6 +22,11 @@ export interface StorageProvider {
   deleteRubric(rubricId: string): Promise<boolean>;
   getDefaultRubric(): Promise<Rubric | null>;
   setDefaultRubric(rubricId: string): Promise<boolean>;
+
+  // Evaluation management methods
+  saveEvaluation(evaluation: Evaluation): Promise<void>;
+  getEvaluation(evaluationId: string): Promise<Evaluation | null>;
+  listEvaluations(): Promise<Evaluation[]>;
 }
 
 // Memory storage provider for local development
@@ -48,11 +34,13 @@ export class MemoryStorageProvider implements StorageProvider {
   private static instance: MemoryStorageProvider;
   private jobs: Map<string, JobStatus>;
   private rubrics: Map<string, Rubric>;
+  private evaluations: Map<string, Evaluation>;
   private defaultRubricId?: string;
 
   constructor() {
     this.jobs = new Map();
     this.rubrics = new Map();
+    this.evaluations = new Map();
   }
 
   public static getInstance(): MemoryStorageProvider {
@@ -214,12 +202,26 @@ export class MemoryStorageProvider implements StorageProvider {
     console.log(`Memory Storage: Rubric ${rubricId} set as default successfully`);
     return true;
   }
+
+  async saveEvaluation(evaluation: Evaluation): Promise<void> {
+    this.evaluations.set(evaluation.id, evaluation);
+    console.log(`Memory Storage: Evaluation ${evaluation.id} saved successfully`);
+  }
+
+  async getEvaluation(evaluationId: string): Promise<Evaluation | null> {
+    return this.evaluations.get(evaluationId) || null;
+  }
+
+  async listEvaluations(): Promise<Evaluation[]> {
+    return Array.from(this.evaluations.values());
+  }
 }
 
 class FileStorageProviderImpl implements StorageProvider {
   private readonly jobsDir: string;
   private readonly pdfsDir: string;
   private readonly rubricsDir: string;
+  private readonly evaluationsDir: string;
   private readonly maxAge: number;
   private readonly retryAttempts: number;
   private readonly retryDelay: number;
@@ -228,6 +230,7 @@ class FileStorageProviderImpl implements StorageProvider {
     this.jobsDir = path.join(baseDir, 'jobs');
     this.pdfsDir = path.join(baseDir, 'pdfs');
     this.rubricsDir = path.join(baseDir, 'rubrics');
+    this.evaluationsDir = path.join(baseDir, 'evaluations');
     this.maxAge = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
     this.retryAttempts = 3;
     this.retryDelay = 1000;
@@ -240,7 +243,8 @@ class FileStorageProviderImpl implements StorageProvider {
     const directories = [
       { path: this.jobsDir, name: 'jobs' },
       { path: this.pdfsDir, name: 'pdfs' },
-      { path: this.rubricsDir, name: 'rubrics' }
+      { path: this.rubricsDir, name: 'rubrics' },
+      { path: this.evaluationsDir, name: 'evaluations' }
     ];
 
     for (const dir of directories) {
@@ -828,6 +832,63 @@ class FileStorageProviderImpl implements StorageProvider {
       return false;
     }
   }
+
+  async saveEvaluation(evaluation: Evaluation): Promise<void> {
+    const filePath = path.join(this.evaluationsDir, `${evaluation.id}.json`);
+    const data = JSON.stringify(evaluation, null, 2);
+    
+    await this.retryOperation(
+      async () => {
+        await this.atomicWrite(filePath, data);
+        console.log(`File Storage: Evaluation ${evaluation.id} saved successfully`);
+      },
+      'saveEvaluation'
+    );
+  }
+
+  async getEvaluation(evaluationId: string): Promise<Evaluation | null> {
+    const filePath = path.join(this.evaluationsDir, `${evaluationId}.json`);
+    
+    try {
+      const data = await fs.promises.readFile(filePath, 'utf-8');
+      return JSON.parse(data) as Evaluation;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  async listEvaluations(): Promise<Evaluation[]> {
+    await this.ensureDirectories();
+    
+    try {
+      const files = await fs.promises.readdir(this.evaluationsDir);
+      const evaluations: Evaluation[] = [];
+      
+      for (const file of files) {
+        if (file.endsWith('.json')) {
+          const filePath = path.join(this.evaluationsDir, file);
+          const data = await fs.promises.readFile(filePath, 'utf-8');
+          const evaluation = JSON.parse(data) as Evaluation;
+          if (evaluation.id && evaluation.data) {
+            evaluations.push({
+              id: evaluation.id,
+              data: evaluation.data,
+              createdAt: evaluation.createdAt ?? new Date().toISOString(),
+              updatedAt: evaluation.updatedAt ?? new Date().toISOString()
+            });
+          }
+        }
+      }
+      
+      return evaluations;
+    } catch (error) {
+      console.error('Error listing evaluations:', error);
+      return [];
+    }
+  }
 }
 
 // Factory function to get the appropriate storage provider
@@ -894,13 +955,13 @@ export function getStorageProvider(): StorageProvider {
     throw new Error('No usable storage directory found');
   }
 
-  // Create the storage provider instance
-  if (storageType === 'memory' || isDev) {
-    console.log('Storage Provider: Using MemoryStorageProvider');
-    return MemoryStorageProvider.getInstance();
-  } else {
+  // Always use FileStorageProvider in production or when explicitly requested
+  if (storageType === 'file' || process.env.NODE_ENV === 'production' || isRender) {
     console.log(`Storage Provider: Using FileStorageProvider with directory ${selectedDir}`);
     return new FileStorageProviderImpl(selectedDir);
+  } else {
+    console.log('Storage Provider: Using MemoryStorageProvider');
+    return MemoryStorageProvider.getInstance();
   }
 }
 

@@ -161,14 +161,18 @@ async function withTimeout<T>(
  * @param staffName Name of the staff member
  * @param date Date of the conversation
  * @param rubric The rubric to use for evaluation
+ * @param rubricId Optional rubric ID
  * @returns Evaluation data for the chunk
  */
 async function analyzeChunkWithClaude(
   conversation: string,
   staffName: string,
   date: string,
-  rubric: Rubric
+  rubric: Rubric,
+  rubricId?: string
 ): Promise<EvaluationData> {
+  console.log(`Analyzing chunk with Claude using rubric: ${rubric.name} (ID: ${rubricId || rubric.id})`);
+  
   const apiKey = process.env.CLAUDE_API_KEY;
   if (!apiKey) {
     throw new Error('CLAUDE_API_KEY environment variable is not set');
@@ -219,7 +223,8 @@ Provide your evaluation in the following JSON format:
   "strengths": [string, string, string],
   "areasForImprovement": [string, string, string],
   "keyRecommendations": [string, string, string],
-  "rubricId": "${rubric.id}",
+  "rubricId": "${rubricId || rubric.id}",
+  "conversationSummary": "${conversation.substring(0, 200)}...",
   "criteria": {
     "criterionName": {
       "score": number (1-5),
@@ -236,11 +241,13 @@ IMPORTANT:
 5. All scores must be numbers between 1 and 5
 6. The overall score must be between 0 and 100
 7. The performance level must be one of: "Exceptional", "Strong", "Proficient", "Developing", "Needs Improvement"
-8. All fields are required
+8. All fields are required, including rubricId and conversationSummary
 9. Respond with ONLY the JSON - no other text
 10. For each criterion, include specific examples and references to parts of the conversation`;
 
   try {
+    const startTime = Date.now();
+    console.log('Sending request to Claude API');
     const response = await anthropic.messages.create({
       model: 'claude-3-7-sonnet-20250219',
       max_tokens: 4000,
@@ -249,16 +256,71 @@ IMPORTANT:
       messages: [{ role: 'user', content: prompt }]
     });
 
-    const content = response.content[0].text;
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    
+    console.log('Received response from Claude API');
+    const jsonMatch = response.content[0].text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
-      throw new Error('No valid JSON found in Claude response');
+      throw new Error('No JSON found in Claude response');
     }
 
-    const evaluation = JSON.parse(jsonMatch[0]) as EvaluationData;
-    const validationResult = validateEvaluationData(evaluation);
+    const parsedResponse = JSON.parse(jsonMatch[0]);
+    console.log('Parsed Claude response:', {
+      rubricId: parsedResponse.rubricId,
+      overallScore: parsedResponse.overallScore,
+      performanceLevel: parsedResponse.performanceLevel
+    });
     
+    // Create a base evaluation object with all required fields
+    const baseEvaluation: EvaluationData = {
+      staffName,
+      date,
+      overallScore: 0,
+      performanceLevel: 'Needs Improvement',
+      criteriaScores: [],
+      observationalNotes: {
+        productKnowledge: { score: 0, notes: '' },
+        handlingObjections: { score: 0, notes: '' },
+        customerEngagement: { score: 0, notes: '' },
+        salesTechniques: { score: 0, notes: '' }
+      },
+      strengths: [],
+      areasForImprovement: [],
+      keyRecommendations: [],
+      rubricId: rubricId || rubric.id,
+      conversationSummary: conversation.substring(0, 200) + '...',
+      criteria: {},
+      metadata: {
+        processingTime: Date.now() - startTime,
+        chunkCount: 1
+      }
+    };
+
+    // Merge the parsed response with the base evaluation, ensuring required fields are preserved
+    const evaluation: EvaluationData = {
+      staffName,
+      date,
+      overallScore: parsedResponse.overallScore,
+      performanceLevel: parsedResponse.performanceLevel,
+      criteriaScores: parsedResponse.criteriaScores,
+      observationalNotes: parsedResponse.observationalNotes,
+      strengths: parsedResponse.strengths,
+      areasForImprovement: parsedResponse.areasForImprovement,
+      keyRecommendations: parsedResponse.keyRecommendations,
+      rubricId: rubricId || rubric.id,
+      conversationSummary: conversation.substring(0, 200) + '...',
+      criteria: parsedResponse.criteria || {},
+      metadata: {
+        processingTime: Date.now() - startTime,
+        chunkCount: 1
+      }
+    };
+
+    console.log('Final evaluation data:', {
+      rubricId: evaluation.rubricId,
+      overallScore: evaluation.overallScore,
+      performanceLevel: evaluation.performanceLevel
+    });
+
+    const validationResult = validateEvaluationData(evaluation);
     if (!validationResult.isValid) {
       console.warn('Validation errors in Claude response:', validationResult.errors);
       throw new Error('Invalid evaluation data from Claude');
@@ -285,13 +347,15 @@ IMPORTANT:
  * @param staffName Name of the staff member
  * @param date Date of the conversation
  * @param rubric The rubric to use for evaluation
+ * @param rubricId Optional rubric ID
  * @returns Combined evaluation
  */
 function combineChunkResults(
   chunkResults: EvaluationData[],
   staffName: string,
   date: string,
-  rubric: Rubric
+  rubric: Rubric,
+  rubricId?: string
 ): EvaluationData {
   if (chunkResults.length === 0) {
     throw new Error('No evaluations to combine');
@@ -352,7 +416,8 @@ function combineChunkResults(
     strengths: chunkResults[0].strengths,
     areasForImprovement: chunkResults[0].areasForImprovement,
     keyRecommendations: chunkResults[0].keyRecommendations,
-    rubricId: rubric.id,
+    rubricId: rubricId || rubric.id,
+    conversationSummary: chunkResults[0].conversationSummary,
     criteria: combinedCriteria,
     metadata: {
       chunkCount: chunkResults.length,
@@ -376,24 +441,29 @@ export async function evaluateConversationInChunks(
   date: string = new Date().toISOString().split('T')[0],
   rubricId?: string
 ): Promise<EvaluationData> {
-  console.log(`Evaluating conversation of length ${conversation.length} characters`);
+  console.log(`Evaluating conversation with rubricId: ${rubricId}`);
   
   // Load the rubric
   let rubric = null;
   if (rubricId) {
-    console.log(`API: GET /api/rubrics/${rubricId} - Retrieving rubric`);
+    console.log(`Loading specified rubric: ${rubricId}`);
     rubric = await RubricApi.getRubric(rubricId);
-    console.log(`API: Rubric ${rubricId} found`);
-  }
-  
-  if (!rubric) {
-    // Fall back to default rubric
+    if (!rubric) {
+      console.error(`Specified rubric ${rubricId} not found`);
+      throw new Error(`Specified rubric ${rubricId} not found`);
+    }
+    console.log(`Successfully loaded rubric: ${rubric.name}`);
+  } else {
+    // Only fall back to default if no rubric was specified
+    console.log('No rubric specified, falling back to default');
     const rubrics = await RubricApi.listRubrics();
     rubric = rubrics.find(r => r.isDefault) || rubrics[0];
     
     if (!rubric) {
+      console.error('No rubric found for evaluation');
       throw new Error('No rubric found for evaluation');
     }
+    console.log(`Using fallback rubric: ${rubric.name}`);
   }
   
   // Check if we should use direct evaluation
@@ -401,9 +471,13 @@ export async function evaluateConversationInChunks(
                               process.env.NODE_ENV === 'development' ||
                               conversation.length <= 50000; // Use direct evaluation for conversations up to 50,000 characters
   
+  console.log(`Conversation length: ${conversation.length} characters`);
+  console.log(`Using direct evaluation: ${useDirectEvaluation}`);
+  
   if (useDirectEvaluation) {
     console.log('Using direct evaluation for better context understanding');
-    return analyzeChunkWithClaude(conversation, staffName, date, rubric);
+    console.log(`Analyzing with rubric: ${rubric.name} (ID: ${rubric.id})`);
+    return analyzeChunkWithClaude(conversation, staffName, date, rubric, rubricId);
   }
   
   // For very large conversations, use chunking as a fallback
@@ -417,10 +491,13 @@ export async function evaluateConversationInChunks(
   const chunkResults: EvaluationData[] = [];
   for (let i = 0; i < chunks.length; i++) {
     console.log(`Analyzing chunk ${i + 1}/${chunks.length}`);
-    const chunkResult = await analyzeChunkWithClaude(chunks[i], staffName, date, rubric);
+    console.log(`Chunk length: ${chunks[i].length} characters`);
+    console.log(`Using rubric: ${rubric.name} (ID: ${rubric.id})`);
+    const chunkResult = await analyzeChunkWithClaude(chunks[i], staffName, date, rubric, rubricId);
     chunkResults.push(chunkResult);
   }
   
   // Combine the results
-  return combineChunkResults(chunkResults, staffName, date, rubric);
+  console.log('Combining chunk results');
+  return combineChunkResults(chunkResults, staffName, date, rubric, rubricId);
 } 

@@ -36,71 +36,36 @@ else
   ls -la "$STORAGE_DIR"
 fi
 
-# Create jobs directory if it doesn't exist
-if [ ! -d "$JOBS_DIR" ]; then
-  echo "Creating jobs directory: $JOBS_DIR"
-  mkdir -p "$JOBS_DIR"
-  if [ $? -ne 0 ]; then
-    echo "ERROR: Failed to create jobs directory: $JOBS_DIR"
+# Create subdirectories
+for dir in "$JOBS_DIR" "$PDFS_DIR" "$RUBRICS_DIR"; do
+  if [ ! -d "$dir" ]; then
+    echo "Creating directory: $dir"
+    mkdir -p "$dir"
+    if [ $? -ne 0 ]; then
+      echo "ERROR: Failed to create directory: $dir"
+    else
+      echo "Directory created successfully"
+    fi
   else
-    echo "Jobs directory created successfully"
+    echo "Directory already exists: $dir"
   fi
-else
-  echo "Jobs directory already exists"
+done
+
+# Set proper permissions
+echo "Setting permissions for storage directories"
+chmod -R 755 "$STORAGE_DIR"
+chown -R $(whoami):$(whoami) "$STORAGE_DIR"
+
+# Initialize default rubric if needed
+if [ ! -f "$RUBRICS_DIR/wine-sales-default.json" ]; then
+  echo "Initializing default rubric"
+  cp /opt/render/project/src/docs/wine-sales-rubric.json "$RUBRICS_DIR/wine-sales-default.json"
+  if [ $? -ne 0 ]; then
+    echo "ERROR: Failed to copy default rubric"
+  else
+    echo "Default rubric initialized successfully"
+  fi
 fi
 
-# Create PDFs directory if it doesn't exist
-if [ ! -d "$PDFS_DIR" ]; then
-  echo "Creating PDFs directory: $PDFS_DIR"
-  mkdir -p "$PDFS_DIR"
-  if [ $? -ne 0 ]; then
-    echo "ERROR: Failed to create PDFs directory: $PDFS_DIR"
-  else
-    echo "PDFs directory created successfully"
-  fi
-else
-  echo "PDFs directory already exists"
-fi
-
-# Create rubrics directory if it doesn't exist
-if [ ! -d "$RUBRICS_DIR" ]; then
-  echo "Creating rubrics directory: $RUBRICS_DIR"
-  mkdir -p "$RUBRICS_DIR"
-  if [ $? -ne 0 ]; then
-    echo "ERROR: Failed to create rubrics directory: $RUBRICS_DIR"
-  else
-    echo "Rubrics directory created successfully"
-  fi
-else
-  echo "Rubrics directory already exists"
-fi
-
-# Set permissions recursively
-echo "Setting permissions on $STORAGE_DIR"
-chmod -R 777 "$STORAGE_DIR"
-if [ $? -ne 0 ]; then
-  echo "WARNING: Failed to set permissions on $STORAGE_DIR"
-  echo "Trying alternative permissions..."
-  chmod -R 755 "$STORAGE_DIR"
-  if [ $? -ne 0 ]; then
-    echo "ERROR: Failed to set alternative permissions on $STORAGE_DIR"
-  else
-    echo "Alternative permissions set successfully"
-  fi
-else
-  echo "Permissions set successfully"
-fi
-
-# Show directory contents and permissions
-echo "Directory contents and permissions:"
-ls -la "$STORAGE_DIR"
-ls -la "$JOBS_DIR"
-ls -la "$PDFS_DIR"
-ls -la "$RUBRICS_DIR"
-
-# Export the actual storage directory for the application to use
-export RENDER_STORAGE_DIR="$STORAGE_DIR"
-echo "Exported RENDER_STORAGE_DIR=$RENDER_STORAGE_DIR"
-
-echo "Setup complete!"
+echo "Setup completed successfully"
 echo "=======================================" 

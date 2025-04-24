@@ -1,0 +1,322 @@
+{
+  "name": "Judd's Hill Wine Sales Evaluation Rubric",
+  "description": "Specialized rubric for evaluating wine tasting room sales interactions with experienced enthusiasts at Judd's Hill.",
+  "isDefault": false,
+  "criteria": [
+    {
+      "id": "sophisticated-greeting",
+      "name": "Sophisticated Greeting and Welcome",
+      "description": "How effectively does the staff member welcome experienced guests and establish a premium experience?",
+      "weight": 10,
+      "scoringLevels": [
+        {
+          "score": 1,
+          "description": "Generic greeting that fails to acknowledge guest experience level"
+        },
+        {
+          "score": 2,
+          "description": "Basic greeting with minimal attempt to gauge wine knowledge"
+        },
+        {
+          "score": 3,
+          "description": "Appropriate greeting that acknowledges guest experience without personalization"
+        },
+        {
+          "score": 4,
+          "description": "Warm, sophisticated greeting that shows awareness of guest wine background"
+        },
+        {
+          "score": 5,
+          "description": "Exceptional welcome that makes experienced guests feel valued and recognized for their wine knowledge"
+        }
+      ]
+    },
+    {
+      "id": "advanced-rapport-building",
+      "name": "Advanced Rapport Building",
+      "description": "How well does the staff member connect with experienced wine enthusiasts and their preferences?",
+      "weight": 12,
+      "scoringLevels": [
+        {
+          "score": 1,
+          "description": "No attempt to connect with guests' specific wine background or interests"
+        },
+        {
+          "score": 2,
+          "description": "Basic questions about wine preferences without meaningful follow-up"
+        },
+        {
+          "score": 3,
+          "description": "Some rapport-building about wine preferences and lifestyle with adequate follow-up"
+        },
+        {
+          "score": 4,
+          "description": "Strong connection through sophisticated wine conversations and personal details (new home, other club memberships)"
+        },
+        {
+          "score": 5,
+          "description": "Exceptional rapport building that uncovers specific wine values, preferences for European styles, and seamlessly connects to Judd's Hill offerings"
+        }
+      ]
+    },
+    {
+      "id": "unique-winery-story",
+      "name": "Judd's Hill Unique Story",
+      "description": "How effectively does the staff member communicate Judd's Hill's unique artistic roots and handcrafted approach?",
+      "weight": 8,
+      "scoringLevels": [
+        {
+          "score": 1,
+          "description": "No mention of Judd's Hill's unique history or artisan approach"
+        },
+        {
+          "score": 2,
+          "description": "Brief, generic mention of winery background without emphasizing unique aspects"
+        },
+        {
+          "score": 3,
+          "description": "Adequate explanation of Judd's Hill's artistic roots and small-lot production"
+        },
+        {
+          "score": 4,
+          "description": "Compelling storytelling about Judd's Hill's unique character with connections to guests' wine values"
+        },
+        {
+          "score": 5,
+          "description": "Passionate, sophisticated narrative that positions Judd's Hill's artistic heritage and craftsmanship as distinct from Silver Oak"
+        }
+      ]
+    },
+    {
+      "id": "wine-storytelling",
+      "name": "Sophisticated Wine Storytelling",
+      "description": "How well does the staff member use sophisticated storytelling and analogies for experienced wine enthusiasts?",
+      "weight": 10,
+      "scoringLevels": [
+        {
+          "score": 1,
+          "description": "Basic technical descriptions without sophisticated analogies"
+        },
+        {
+          "score": 2,
+          "description": "Generic wine descriptions that don't address preferences for European styles"
+        },
+        {
+          "score": 3,
+          "description": "Appropriate stories and analogies connecting to lower alcohol preferences"
+        },
+        {
+          "score": 4,
+          "description": "Advanced storytelling that compares Judd's Hill to European styles and highlights terroir elements"
+        },
+        {
+          "score": 5,
+          "description": "Exceptional, sophisticated analogies that perfectly illustrate Judd's Hill's unique characteristics for discerning palates"
+        }
+      ]
+    },
+    {
+      "id": "subtle-buying-signals",
+      "name": "Recognition of Subtle Buying Signals",
+      "description": "How well does the staff member notice and respond to subtle buying signals from experienced guests?",
+      "weight": 12,
+      "scoringLevels": [
+        {
+          "score": 1,
+          "description": "Misses subtle buying signals completely"
+        },
+        {
+          "score": 2,
+          "description": "Notices obvious signals but misses more subtle indicators of interest"
+        },
+        {
+          "score": 3,
+          "description": "Recognizes main buying signals with appropriate follow-up"
+        },
+        {
+          "score": 4,
+          "description": "Skillfully identifies nuanced interest cues and responds with sophisticated approaches"
+        },
+        {
+          "score": 5,
+          "description": "Expertly recognizes and acts on the most subtle buying signals without appearing pushy"
+        }
+      ]
+    },
+    {
+      "id": "sophisticated-data-capture",
+      "name": "Non-Intrusive Data Capture",
+      "description": "How effectively does the staff member collect information from wine-savvy guests?",
+      "weight": 10,
+      "scoringLevels": [
+        {
+          "score": 1,
+          "description": "No attempt to capture guest data or preferences"
+        },
+        {
+          "score": 2,
+          "description": "Awkward or overly direct attempts at data collection"
+        },
+        {
+          "score": 3,
+          "description": "Acceptable data capture but without clear value proposition for experienced guests"
+        },
+        {
+          "score": 4,
+          "description": "Smooth, sophisticated data collection that feels beneficial and exclusive"
+        },
+        {
+          "score": 5,
+          "description": "Masterful, completely natural data capture that makes guests eager to share contact information"
+        }
+      ]
+    },
+    {
+      "id": "sophisticated-sale-approach",
+      "name": "Sophisticated Ask for the Sale",
+      "description": "How effectively does the staff member ask for wine purchases from experienced collectors?",
+      "weight": 12,
+      "scoringLevels": [
+        {
+          "score": 1,
+          "description": "No ask or inappropriate selling approach for sophisticated guests"
+        },
+        {
+          "score": 2,
+          "description": "Generic sales pitch not tailored to experienced enthusiasts"
+        },
+        {
+          "score": 3,
+          "description": "Reasonable sales approach that acknowledges guest sophistication"
+        },
+        {
+          "score": 4,
+          "description": "Confident, tailored ask for purchase at appropriate time with compelling rationale"
+        },
+        {
+          "score": 5,
+          "description": "Exceptional, sophisticated sales approach that makes purchasing feel like a natural extension of the experience"
+        }
+      ]
+    },
+    {
+      "id": "comparative-recommendations",
+      "name": "Comparative Wine Recommendations",
+      "description": "How well does the staff member recommend wines in contrast to Silver Oak membership experience?",
+      "weight": 8,
+      "scoringLevels": [
+        {
+          "score": 1,
+          "description": "Generic recommendations that ignore Silver Oak experience or European preferences"
+        },
+        {
+          "score": 2,
+          "description": "Basic recommendations with minimal consideration of sophisticated palate"
+        },
+        {
+          "score": 3,
+          "description": "Appropriate recommendations highlighting lower alcohol options"
+        },
+        {
+          "score": 4,
+          "description": "Well-tailored recommendations that respectfully differentiate from Silver Oak"
+        },
+        {
+          "score": 5,
+          "description": "Masterful recommendations that perfectly complement Silver Oak membership while showcasing Judd's Hill's unique qualities"
+        }
+      ]
+    },
+    {
+      "id": "premium-wine-club",
+      "name": "Premium Wine Club Presentation",
+      "description": "How effectively does the staff member present the wine club as complementary to Silver Oak membership?",
+      "weight": 12,
+      "scoringLevels": [
+        {
+          "score": 1,
+          "description": "No mention of wine club or inappropriate positioning against Silver Oak"
+        },
+        {
+          "score": 2,
+          "description": "Basic wine club information without addressing existing club memberships"
+        },
+        {
+          "score": 3,
+          "description": "Adequate explanation of benefits with some customization for experienced members"
+        },
+        {
+          "score": 4,
+          "description": "Sophisticated presentation positioning the club as complementary to Silver Oak"
+        },
+        {
+          "score": 5,
+          "description": "Exceptional, non-pushy wine club presentation that makes membership feel essential for their new Yountville home"
+        }
+      ]
+    },
+    {
+      "id": "yountville-recommendations",
+      "name": "Local Expertise and Recommendations",
+      "description": "How well does the staff member provide restaurant recommendations and showcase local knowledge?",
+      "weight": 6,
+      "scoringLevels": [
+        {
+          "score": 1,
+          "description": "No local recommendations even when opportunity arises"
+        },
+        {
+          "score": 2,
+          "description": "Generic recommendations without consideration for new homeowners"
+        },
+        {
+          "score": 3,
+          "description": "Adequate restaurant suggestions when directly asked"
+        },
+        {
+          "score": 4,
+          "description": "Proactive, well-curated recommendations that anticipate needs as new homeowners"
+        },
+        {
+          "score": 5,
+          "description": "Exceptional insider knowledge that positions staff member as an invaluable resource for their new Yountville lifestyle"
+        }
+      ]
+    }
+  ],
+  "performanceLevels": [
+    {
+      "name": "Needs Improvement",
+      "minScore": 0,
+      "maxScore": 60,
+      "description": "Insufficient approach to sophisticated guests requiring extensive training"
+    },
+    {
+      "name": "Developing",
+      "minScore": 60,
+      "maxScore": 70,
+      "description": "Basic skills present but lacking sophistication needed for experienced enthusiasts"
+    },
+    {
+      "name": "Proficient",
+      "minScore": 70,
+      "maxScore": 80,
+      "description": "Competent interaction with good understanding of experienced guest needs"
+    },
+    {
+      "name": "Excellent",
+      "minScore": 80,
+      "maxScore": 90,
+      "description": "Very effective approach with strong connections to sophisticated guests"
+    },
+    {
+      "name": "Outstanding",
+      "minScore": 90,
+      "maxScore": 100,
+      "description": "Exceptional sales interaction perfectly tailored to experienced wine enthusiasts"
+    }
+  ],
+  "id": "f7100ab3-68a8-442c-a64d-123c895b8d66",
+  "createdAt": "2025-04-24T17:27:52.889Z",
+  "updatedAt": "2025-04-24T17:27:52.889Z"
+}

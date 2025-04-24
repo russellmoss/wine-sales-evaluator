@@ -1,4 +1,5 @@
-import { Rubric } from '../types/rubric';
+import { Rubric, PerformanceLevel } from '../types/rubric';
+import { Evaluation } from '../types/evaluation';
 
 // Helper function to get the base URL
 function getBaseUrl() {
@@ -20,6 +21,15 @@ function getBaseUrl() {
   const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
   const host = process.env.VERCEL_URL || process.env.RENDER_EXTERNAL_URL || 'localhost:3000';
   return `${protocol}://${host}${basePath}`;
+}
+
+export interface RubricEvaluation {
+  rubricId: string;
+  conversation: string;
+  scores: Record<string, PerformanceLevel>;
+  notes: Record<string, string>;
+  overallScore: number;
+  timestamp: string;
 }
 
 // API client for rubric management
@@ -112,5 +122,19 @@ export const RubricApi = {
     
     const result = await response.json();
     return result.rubric;
+  },
+
+  async saveEvaluation(evaluation: RubricEvaluation): Promise<void> {
+    const response = await fetch(`${getBaseUrl()}/api/evaluations`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(evaluation),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to save evaluation');
+    }
   }
 };

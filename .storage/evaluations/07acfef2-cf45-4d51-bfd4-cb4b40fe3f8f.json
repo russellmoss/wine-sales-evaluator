@@ -1,0 +1,143 @@
+{
+  "id": "07acfef2-cf45-4d51-bfd4-cb4b40fe3f8f",
+  "data": {
+    "staffName": "Manual Evaluation",
+    "date": "2025-04-24",
+    "overallScore": 79,
+    "performanceLevel": "Proficient",
+    "criteriaScores": [
+      {
+        "criterion": "initial-greeting",
+        "weight": 10,
+        "score": 3,
+        "weightedScore": 0,
+        "notes": "test"
+      },
+      {
+        "criterion": "building-rapport",
+        "weight": 10,
+        "score": 3,
+        "weightedScore": 0,
+        "notes": "test"
+      },
+      {
+        "criterion": "winery-history",
+        "weight": 10,
+        "score": 3,
+        "weightedScore": 0,
+        "notes": "test"
+      },
+      {
+        "criterion": "storytelling",
+        "weight": 10,
+        "score": 3,
+        "weightedScore": 0,
+        "notes": "test"
+      },
+      {
+        "criterion": "buying-signals",
+        "weight": 10,
+        "score": 3,
+        "weightedScore": 0,
+        "notes": "testing"
+      },
+      {
+        "criterion": "data-capture",
+        "weight": 10,
+        "score": 3,
+        "weightedScore": 0,
+        "notes": "testing again"
+      },
+      {
+        "criterion": "asking-for-sale",
+        "weight": 10,
+        "score": 3,
+        "weightedScore": 0,
+        "notes": "this is also a test"
+      },
+      {
+        "criterion": "wine-recommendations",
+        "weight": 10,
+        "score": 3,
+        "weightedScore": 0,
+        "notes": "Yep, we are testing"
+      },
+      {
+        "criterion": "wine-club",
+        "weight": 10,
+        "score": 3,
+        "weightedScore": 0,
+        "notes": "do betttre"
+      },
+      {
+        "criterion": "closing-interaction",
+        "weight": 10,
+        "score": 3,
+        "weightedScore": 0,
+        "notes": "test"
+      }
+    ],
+    "observationalNotes": {
+      "productKnowledge": {
+        "score": 3,
+        "notes": ""
+      },
+      "handlingObjections": {
+        "score": 3,
+        "notes": ""
+      }
+    },
+    "strengths": [],
+    "areasForImprovement": [],
+    "keyRecommendations": [],
+    "rubricId": "wine-sales-default",
+    "criteria": {
+      "initial-greeting": {
+        "score": 3,
+        "feedback": "test"
+      },
+      "building-rapport": {
+        "score": 3,
+        "feedback": "test"
+      },
+      "winery-history": {
+        "score": 3,
+        "feedback": "test"
+      },
+      "storytelling": {
+        "score": 3,
+        "feedback": "test"
+      },
+      "buying-signals": {
+        "score": 3,
+        "feedback": "testing"
+      },
+      "data-capture": {
+        "score": 3,
+        "feedback": "testing again"
+      },
+      "asking-for-sale": {
+        "score": 3,
+        "feedback": "this is also a test"
+      },
+      "wine-recommendations": {
+        "score": 3,
+        "feedback": "Yep, we are testing"
+      },
+      "wine-club": {
+        "score": 3,
+        "feedback": "do betttre"
+      },
+      "closing-interaction": {
+        "score": 3,
+        "feedback": "test"
+      }
+    }
+  },
+  "createdAt": "2025-04-24T18:03:39.540Z",
+  "updatedAt": "2025-04-24T18:03:39.540Z",
+  "metadata": {
+    "model": "manual",
+    "direct": true
+  }
+}

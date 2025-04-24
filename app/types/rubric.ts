@@ -20,13 +20,14 @@ export interface Criterion {
   name: string;               // Display name
   description: string;        // What this evaluates
   weight: number;             // Weight as percentage (0-100)
-  scoringLevels: ScoringLevel[]; // Descriptions for each score
+  scoringLevels: ScoringLevel[];
 }
 
 // Scoring level definition
 export interface ScoringLevel {
   score: number;              // Score value (1-5)
   description: string;        // What this score represents
+  level: string;             // Level name (e.g., "Needs Improvement", "Meets Expectations", etc.)
 }
 
 // Performance level thresholds
@@ -109,154 +110,151 @@ export function validateRubric(rubric: Rubric): { isValid: boolean; errors: stri
 
 // Helper function to create a default wine sales rubric
 export function createDefaultWineSalesRubric(): Rubric {
-  const now = new Date().toISOString();
-  const rubricId = 'wine-sales-default';
-  
   return {
-    id: rubricId,
-    name: 'Wine Sales Evaluation',
-    description: 'Standard rubric for evaluating wine tasting room sales interactions',
+    id: 'default-wine-sales',
+    name: 'Wine Sales Performance',
+    description: 'Evaluates staff performance in wine sales and customer engagement',
     isDefault: true,
-    createdAt: now,
-    updatedAt: now,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
     criteria: [
       {
-        id: `${rubricId}-criterion-1`,
-        name: 'Initial Greeting and Welcome',
+        id: 'greeting',
+        name: 'Initial Greeting',
         description: 'How effectively does the staff member welcome guests and set a positive tone?',
         weight: 8,
         scoringLevels: [
-          { score: 1, description: 'No greeting or unwelcoming approach' },
-          { score: 2, description: 'Basic greeting but minimal warmth' },
-          { score: 3, description: 'Friendly greeting but lacks personalization' },
-          { score: 4, description: 'Warm, friendly greeting with good eye contact' },
-          { score: 5, description: 'Exceptional welcome that makes guests feel valued and excited' }
+          { score: 1, description: 'No greeting or unwelcoming approach', level: 'Needs Improvement' },
+          { score: 2, description: 'Basic greeting but minimal warmth', level: 'Developing' },
+          { score: 3, description: 'Friendly greeting with basic engagement', level: 'Meets Expectations' },
+          { score: 4, description: 'Warm, personalized greeting with good eye contact', level: 'Exceeds Expectations' },
+          { score: 5, description: 'Exceptional greeting with immediate rapport building', level: 'Exceptional' }
         ]
       },
       {
-        id: `${rubricId}-criterion-2`,
-        name: 'Building Rapport',
+        id: 'personal-connection',
+        name: 'Personal Connection',
         description: 'How well does the staff member connect personally with the guests?',
         weight: 10,
         scoringLevels: [
-          { score: 1, description: 'No attempt to connect personally with guests' },
-          { score: 2, description: 'Minimal small talk, mostly transactional' },
-          { score: 3, description: 'Some rapport-building questions but limited follow-up' },
-          { score: 4, description: 'Good personal connection through meaningful conversation' },
-          { score: 5, description: 'Excellent rapport building, including origin questions, future plans, and genuine interest' }
+          { score: 1, description: 'No attempt to connect personally with guests', level: 'Needs Improvement' },
+          { score: 2, description: 'Minimal small talk, mostly transactional', level: 'Developing' },
+          { score: 3, description: 'Basic personal connection with some engagement', level: 'Meets Expectations' },
+          { score: 4, description: 'Strong personal connection with good conversation flow', level: 'Exceeds Expectations' },
+          { score: 5, description: 'Exceptional personal connection with memorable interaction', level: 'Exceptional' }
         ]
       },
       {
-        id: `${rubricId}-criterion-3`,
-        name: 'Winery History and Ethos',
+        id: 'winery-story',
+        name: 'Winery Story',
         description: 'How effectively does the staff member communicate the winery\'s story and values?',
         weight: 10,
         scoringLevels: [
-          { score: 1, description: 'No mention of winery history or values' },
-          { score: 2, description: 'Brief, factual mention of winery background' },
-          { score: 3, description: 'Adequate explanation of winery history and values' },
-          { score: 4, description: 'Compelling storytelling about winery history, connecting to wines' },
-          { score: 5, description: 'Passionate, engaging narrative that brings the winery ethos to life' }
+          { score: 1, description: 'No mention of winery history or values', level: 'Needs Improvement' },
+          { score: 2, description: 'Brief, factual mention of winery background', level: 'Developing' },
+          { score: 3, description: 'Basic winery story with some enthusiasm', level: 'Meets Expectations' },
+          { score: 4, description: 'Engaging winery story with personal connection', level: 'Exceeds Expectations' },
+          { score: 5, description: 'Compelling winery story with emotional impact', level: 'Exceptional' }
         ]
       },
       {
-        id: `${rubricId}-criterion-4`,
-        name: 'Storytelling and Analogies',
+        id: 'storytelling',
+        name: 'Storytelling',
         description: 'How well does the staff member use storytelling and analogies to describe wines?',
         weight: 10,
         scoringLevels: [
-          { score: 1, description: 'Technical descriptions only, no storytelling or analogies' },
-          { score: 2, description: 'Minimal storytelling, mostly factual information' },
-          { score: 3, description: 'Some storytelling elements but lacking rich analogies' },
-          { score: 4, description: 'Good use of stories and analogies that help guests understand wines' },
-          { score: 5, description: 'Exceptional storytelling that creates memorable experiences and makes wine accessible' }
+          { score: 1, description: 'Technical descriptions only, no storytelling or analogies', level: 'Needs Improvement' },
+          { score: 2, description: 'Minimal storytelling, mostly factual information', level: 'Developing' },
+          { score: 3, description: 'Basic storytelling with some analogies', level: 'Meets Expectations' },
+          { score: 4, description: 'Engaging storytelling with effective analogies', level: 'Exceeds Expectations' },
+          { score: 5, description: 'Exceptional storytelling with memorable analogies', level: 'Exceptional' }
         ]
       },
       {
-        id: `${rubricId}-criterion-5`,
-        name: 'Recognition of Buying Signals',
+        id: 'buying-signals',
+        name: 'Buying Signals',
         description: 'How well does the staff member notice and respond to buying signals?',
         weight: 12,
         scoringLevels: [
-          { score: 1, description: 'Misses obvious buying signals completely' },
-          { score: 2, description: 'Notices some signals but response is delayed or inappropriate' },
-          { score: 3, description: 'Recognizes main buying signals with adequate response' },
-          { score: 4, description: 'Quickly identifies buying signals and responds effectively' },
-          { score: 5, description: 'Expertly recognizes subtle cues and capitalizes on buying moments' }
+          { score: 1, description: 'Misses obvious buying signals completely', level: 'Needs Improvement' },
+          { score: 2, description: 'Notices some signals but response is delayed or inappropriate', level: 'Developing' },
+          { score: 3, description: 'Recognizes and responds to most buying signals', level: 'Meets Expectations' },
+          { score: 4, description: 'Proactively identifies and capitalizes on buying signals', level: 'Exceeds Expectations' },
+          { score: 5, description: 'Exceptional at reading and responding to buying signals', level: 'Exceptional' }
         ]
       },
       {
-        id: `${rubricId}-criterion-6`,
-        name: 'Customer Data Capture',
+        id: 'data-collection',
+        name: 'Data Collection',
         description: 'How effectively does the staff member attempt to collect customer information?',
         weight: 8,
         scoringLevels: [
-          { score: 1, description: 'No attempt to capture customer data' },
-          { score: 2, description: 'Single basic attempt at data collection' },
-          { score: 3, description: 'Multiple attempts but without explaining benefits' },
-          { score: 4, description: 'Good data capture attempts with clear value proposition' },
-          { score: 5, description: 'Natural, non-intrusive data collection that feels beneficial to guest' }
+          { score: 1, description: 'No attempt to capture customer data', level: 'Needs Improvement' },
+          { score: 2, description: 'Single basic attempt at data collection', level: 'Developing' },
+          { score: 3, description: 'Multiple attempts to collect basic information', level: 'Meets Expectations' },
+          { score: 4, description: 'Effective data collection with good follow-up', level: 'Exceeds Expectations' },
+          { score: 5, description: 'Exceptional data collection with detailed information', level: 'Exceptional' }
         ]
       },
       {
-        id: `${rubricId}-criterion-7`,
-        name: 'Asking for the Sale',
+        id: 'asking-for-sale',
+        name: 'Asking for Sale',
         description: 'How effectively does the staff member ask for wine purchases?',
         weight: 12,
         scoringLevels: [
-          { score: 1, description: 'Never asks for sale or suggests purchase' },
-          { score: 2, description: 'Vague suggestion about purchasing without direct ask' },
-          { score: 3, description: 'Basic closing attempt but lacks confidence' },
-          { score: 4, description: 'Clear, confident ask for purchase at appropriate time' },
-          { score: 5, description: 'Multiple strategic closing attempts that feel natural and appropriate' }
+          { score: 1, description: 'Never asks for sale or suggests purchase', level: 'Needs Improvement' },
+          { score: 2, description: 'Vague suggestion about purchasing without direct ask', level: 'Developing' },
+          { score: 3, description: 'Direct ask for purchase with basic closing', level: 'Meets Expectations' },
+          { score: 4, description: 'Effective closing with multiple attempts', level: 'Exceeds Expectations' },
+          { score: 5, description: 'Exceptional closing with personalized approach', level: 'Exceptional' }
         ]
       },
       {
-        id: `${rubricId}-criterion-8`,
-        name: 'Personalized Wine Recommendations',
+        id: 'customization',
+        name: 'Customization',
         description: 'How well does the staff member customize wine recommendations based on guest preferences?',
         weight: 10,
         scoringLevels: [
-          { score: 1, description: 'Generic recommendations unrelated to expressed interests' },
-          { score: 2, description: 'Basic recommendations with minimal personalization' },
-          { score: 3, description: 'Adequate recommendations based on general preferences' },
-          { score: 4, description: 'Well-tailored recommendations based on specific guest feedback' },
-          { score: 5, description: 'Expertly customized selections that perfectly match expressed interests' }
+          { score: 1, description: 'Generic recommendations unrelated to expressed interests', level: 'Needs Improvement' },
+          { score: 2, description: 'Basic recommendations with minimal personalization', level: 'Developing' },
+          { score: 3, description: 'Personalized recommendations based on preferences', level: 'Meets Expectations' },
+          { score: 4, description: 'Highly customized recommendations with good reasoning', level: 'Exceeds Expectations' },
+          { score: 5, description: 'Exceptional customization with perfect wine matches', level: 'Exceptional' }
         ]
       },
       {
-        id: `${rubricId}-criterion-9`,
-        name: 'Wine Club Presentation',
+        id: 'wine-club',
+        name: 'Wine Club',
         description: 'How effectively does the staff member present and invite guests to join the wine club?',
         weight: 12,
         scoringLevels: [
-          { score: 1, description: 'No mention of wine club or inadequate response when asked' },
-          { score: 2, description: 'Basic wine club information without personalization' },
-          { score: 3, description: 'Adequate explanation of benefits but minimal customization' },
-          { score: 4, description: 'Good presentation of wine club with benefits tailored to guest interests' },
-          { score: 5, description: 'Compelling, personalized wine club presentation with clear invitation to join' }
+          { score: 1, description: 'No mention of wine club or inadequate response when asked', level: 'Needs Improvement' },
+          { score: 2, description: 'Basic wine club information without personalization', level: 'Developing' },
+          { score: 3, description: 'Clear wine club presentation with basic benefits', level: 'Meets Expectations' },
+          { score: 4, description: 'Compelling wine club presentation with personalized benefits', level: 'Exceeds Expectations' },
+          { score: 5, description: 'Exceptional wine club presentation with immediate sign-up', level: 'Exceptional' }
         ]
       },
       {
-        id: `${rubricId}-criterion-10`,
-        name: 'Closing Interaction',
+        id: 'conclusion',
+        name: 'Conclusion',
         description: 'How well does the staff member conclude the interaction and encourage future visits?',
         weight: 8,
         scoringLevels: [
-          { score: 1, description: 'Abrupt ending with no thanks or future invitation' },
-          { score: 2, description: 'Basic thank you but no encouragement to return' },
-          { score: 3, description: 'Polite conclusion with general invitation to return' },
-          { score: 4, description: 'Warm thank you with specific suggestion for future visit' },
-          { score: 5, description: 'Memorable farewell that reinforces relationship and ensures future visits' }
+          { score: 1, description: 'Abrupt ending with no thanks or future invitation', level: 'Needs Improvement' },
+          { score: 2, description: 'Basic thank you but no encouragement to return', level: 'Developing' },
+          { score: 3, description: 'Polite conclusion with invitation to return', level: 'Meets Expectations' },
+          { score: 4, description: 'Warm conclusion with specific invitation to return', level: 'Exceeds Expectations' },
+          { score: 5, description: 'Exceptional conclusion with memorable send-off', level: 'Exceptional' }
         ]
       }
     ],
     performanceLevels: [
-      { name: 'Exceptional', minScore: 90, maxScore: 100, description: 'Outstanding performance that exceeds expectations in all areas' },
-      { name: 'Strong', minScore: 80, maxScore: 90, description: 'Very good performance with minor areas for improvement' },
-      { name: 'Proficient', minScore: 70, maxScore: 80, description: 'Solid performance that meets expectations' },
-      { name: 'Developing', minScore: 60, maxScore: 70, description: 'Basic performance with significant areas for improvement' },
-      { name: 'Needs Improvement', minScore: 0, maxScore: 60, description: 'Performance requiring substantial training and development' }
+      { name: 'Needs Improvement', minScore: 0, maxScore: 59, description: 'Significant improvement needed in sales approach' },
+      { name: 'Developing', minScore: 60, maxScore: 69, description: 'Basic skills present but needs refinement' },
+      { name: 'Meets Expectations', minScore: 70, maxScore: 84, description: 'Solid performance meeting basic requirements' },
+      { name: 'Exceeds Expectations', minScore: 85, maxScore: 94, description: 'Strong performance exceeding requirements' },
+      { name: 'Exceptional', minScore: 95, maxScore: 100, description: 'Outstanding performance in all areas' }
     ]
   };
 }

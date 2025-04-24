@@ -6,34 +6,29 @@ import Link from 'next/link';
 import MarkdownImporter from './MarkdownImporter';
 import LoadingIndicator from './LoadingIndicator';
 import ErrorDisplay from './ErrorDisplay';
-import { EvaluationData } from '../types/evaluation';
+import { EvaluationData, DualAnalysisResult } from '../types/evaluation';
 import { exportEvaluationToPDF } from '../utils/pdfExport';
 import { exportConversationToPDF } from '../utils/conversationPdfExport';
 import { cleanupConversation } from '../utils/conversationCleanup';
 
 const WineEvaluationDashboard: React.FC = () => {
-  const [evaluationData, setEvaluationData] = useState<EvaluationData | null>(null);
+  const [evaluationData, setEvaluationData] = useState<DualAnalysisResult | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [markdown, setMarkdown] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string>('');
   const [isCleaningUp, setIsCleaningUp] = useState(false);
 
-  const handleAnalysisComplete = (newEvaluationData: EvaluationData, markdownContent: string, markdownFileName: string) => {
+  const handleAnalysisComplete = (newEvaluationData: DualAnalysisResult, markdownContent: string, markdownFileName: string) => {
     try {
       console.log('Received evaluation data:', JSON.stringify(newEvaluationData, null, 2));
-      console.log('Validation check - required fields:', {
-        hasStaffName: Boolean(newEvaluationData.staffName),
-        hasCriteriaScores: Boolean(newEvaluationData.criteriaScores),
-        hasOverallScore: Boolean(newEvaluationData.overallScore),
-        hasPerformanceLevel: Boolean(newEvaluationData.performanceLevel)
-      });
       
       // Reset any previous errors
       setError(null);
       
       // Validate that the received data is in the expected format
-      if (!newEvaluationData.staffName || !newEvaluationData.criteriaScores) {
+      if (!newEvaluationData.claude.result.staffName || !newEvaluationData.claude.result.criteriaScores ||
+          !newEvaluationData.gemini.result.staffName || !newEvaluationData.gemini.result.criteriaScores) {
         throw new Error('The received evaluation data is incomplete');
       }
       
@@ -77,24 +72,19 @@ const WineEvaluationDashboard: React.FC = () => {
     }
   };
 
-  const handleExportPDF = () => {
+  const handleExportPDF = (model: 'claude' | 'gemini') => {
     if (!evaluationData) {
       toast.error('No evaluation data available');
       return;
     }
     try {
-      exportEvaluationToPDF(evaluationData);
-      toast.success('Evaluation exported as PDF');
+      const result = model === 'claude' ? evaluationData.claude.result : evaluationData.gemini.result;
+      exportEvaluationToPDF(result);
+      toast.success(`${model.charAt(0).toUpperCase() + model.slice(1)} evaluation exported as PDF`);
     } catch (error) {
       console.error('Error exporting evaluation:', error);
       toast.error('Failed to export evaluation. Please try again.');
     }
-  };
-
-  const retryLastAnalysis = () => {
-    setError(null);
-    // If you have the markdown stored, you can retry the analysis here
-    // This would need to be implemented based on your specific requirements
   };
 
   // Helper function for overall score color
@@ -117,27 +107,82 @@ const WineEvaluationDashboard: React.FC = () => {
     return color;
   };
 
-  // Add a debug log when evaluation data changes
-  useEffect(() => {
-    if (evaluationData) {
-      console.log('Evaluation data updated - Full details:', {
-        staffName: evaluationData.staffName,
-        date: evaluationData.date,
-        overallScore: {
-          value: evaluationData.overallScore,
-          color: getOverallScoreColor(evaluationData.overallScore),
-          performanceLevel: evaluationData.performanceLevel
-        },
-        criteriaScores: evaluationData.criteriaScores.map(c => ({
-          criterion: c.criterion,
-          score: c.score,
-          color: getCriterionScoreColor(c.score),
-          weight: c.weight,
-          notes: c.notes
-        }))
-      });
-    }
-  }, [evaluationData]);
+  // Render a single evaluation panel
+  const renderEvaluationPanel = (data: EvaluationData, model: 'claude' | 'gemini') => (
+    <div className="bg-white shadow rounded-lg p-6 flex-1">
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-xl font-bold">{model.charAt(0).toUpperCase() + model.slice(1)} Analysis</h2>
+        <button
+          onClick={() => handleExportPDF(model)}
+          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-500"
+        >
+          Export PDF
+        </button>
+      </div>
+
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h3 className="text-lg font-semibold">{data.staffName}</h3>
+          <p className="text-gray-600">Date: {data.date}</p>
+        </div>
+        <div className="text-right">
+          <div className={`text-3xl font-bold ${getOverallScoreColor(data.overallScore)}`}>
+            {data.overallScore}%
+          </div>
+          <div className="text-sm font-medium text-gray-600">{data.performanceLevel}</div>
+        </div>
+      </div>
+
+      {/* Criteria Scores */}
+      <div className="mb-6">
+        <h3 className="text-lg font-medium mb-3">Criteria Scores</h3>
+        <div className="space-y-3">
+          {data.criteriaScores.map((criterion, index) => (
+            <div key={index} className="border-b pb-3">
+              <div className="flex justify-between items-center">
+                <div className="font-medium">{criterion.criterion}</div>
+                <div className="flex items-center gap-2">
+                  <div className={`px-3 py-1 rounded-full text-white text-sm ${getCriterionScoreColor(criterion.score)}`}>
+                    {criterion.score}/5
+                  </div>
+                  <span className="text-gray-500">(Weight: {criterion.weight})</span>
+                </div>
+              </div>
+              <div className="mt-2 text-sm text-gray-600">{criterion.notes}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Strengths and Areas for Improvement */}
+      <div className="space-y-6">
+        <div>
+          <h3 className="text-lg font-medium mb-3">Strengths</h3>
+          <ul className="list-disc list-inside space-y-2">
+            {data.strengths.map((strength, index) => (
+              <li key={index} className="text-gray-700">{strength}</li>
+            ))}
+          </ul>
+        </div>
+        <div>
+          <h3 className="text-lg font-medium mb-3">Areas for Improvement</h3>
+          <ul className="list-disc list-inside space-y-2">
+            {data.areasForImprovement.map((area, index) => (
+              <li key={index} className="text-gray-700">{area}</li>
+            ))}
+          </ul>
+        </div>
+        <div>
+          <h3 className="text-lg font-medium mb-3">Key Recommendations</h3>
+          <ul className="list-disc list-inside space-y-2">
+            {data.keyRecommendations.map((recommendation, index) => (
+              <li key={index} className="text-gray-700">{recommendation}</li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -187,23 +232,12 @@ const WineEvaluationDashboard: React.FC = () => {
               </>
             )}
           </button>
-          
-          <button
-            onClick={handleExportPDF}
-            disabled={!evaluationData || isAnalyzing}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-500 flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-            </svg>
-            Export Report
-          </button>
         </div>
       </div>
       
       {/* Add loading indicator when analyzing */}
       {isAnalyzing && (
-        <LoadingIndicator message="Claude is analyzing the conversation..." />
+        <LoadingIndicator message="Analyzing conversation with Claude and Gemini..." />
       )}
       
       {/* Add error display when there's an error */}
@@ -211,89 +245,18 @@ const WineEvaluationDashboard: React.FC = () => {
         <ErrorDisplay 
           title="Analysis Error" 
           message={error}
-          onRetry={retryLastAnalysis} 
+          onRetry={() => {
+            setError(null);
+            // Add retry logic here if needed
+          }} 
         />
       )}
       
       {/* Evaluation display */}
       {evaluationData && !isAnalyzing && !error && (
-        <div className="bg-white shadow rounded-lg p-6">
-          <div className="flex justify-between items-center mb-6">
-            <div>
-              <h2 className="text-xl font-semibold">{evaluationData.staffName}</h2>
-              <p className="text-gray-600">Date: {evaluationData.date}</p>
-            </div>
-            <div className="text-right">
-              <div 
-                className={`text-3xl font-bold ${getOverallScoreColor(evaluationData.overallScore)}`}
-              >
-                {evaluationData.overallScore}%
-              </div>
-              <div className="text-sm font-medium text-gray-600">{evaluationData.performanceLevel}</div>
-            </div>
-          </div>
-          
-          {/* Criteria Scores */}
-          <div className="mb-6">
-            <h3 className="text-lg font-medium mb-3">Criteria Scores</h3>
-            <div className="space-y-3">
-              {evaluationData.criteriaScores.map((criterion, index) => (
-                <div key={index} className="border-b pb-3">
-                  <div className="flex justify-between items-center">
-                    <div className="font-medium">{criterion.criterion}</div>
-                    <div className="flex items-center gap-2">
-                      <div 
-                        className={`px-3 py-1 rounded-full text-white text-sm ${getCriterionScoreColor(criterion.score)}`}
-                      >
-                        {criterion.score}/5
-                      </div>
-                      <span className="text-gray-500">(Weight: {criterion.weight})</span>
-                    </div>
-                  </div>
-                  <div className="mt-1 text-sm text-gray-600">{criterion.notes}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-          
-          {/* Strengths and Areas for Improvement */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            <div>
-              <h3 className="text-lg font-medium mb-2">Strengths</h3>
-              <ul className="list-disc pl-5 space-y-1">
-                {evaluationData.strengths.map((strength, index) => (
-                  <li key={index} className="text-gray-700">{strength}</li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <h3 className="text-lg font-medium mb-2">Areas for Improvement</h3>
-              <ul className="list-disc pl-5 space-y-1">
-                {evaluationData.areasForImprovement.map((area, index) => (
-                  <li key={index} className="text-gray-700">{area}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
-          
-          {/* Key Recommendations */}
-          <div>
-            <h3 className="text-lg font-medium mb-2">Key Recommendations</h3>
-            <ul className="list-disc pl-5 space-y-1">
-              {evaluationData.keyRecommendations.map((recommendation, index) => (
-                <li key={index} className="text-gray-700">{recommendation}</li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      )}
-      
-      {/* Empty state */}
-      {!evaluationData && !isAnalyzing && !error && (
-        <div className="text-center py-12">
-          <p className="text-gray-500">
-            {isAnalyzing ? 'Analyzing conversation...' : 'No evaluation data loaded. Import a conversation or JSON file to begin.'}
-          </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {renderEvaluationPanel(evaluationData.claude.result, 'claude')}
+          {renderEvaluationPanel(evaluationData.gemini.result, 'gemini')}
         </div>
       )}
     </div>

@@ -3,13 +3,12 @@
 import React, { FC, useRef, useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import { validateEvaluationData } from '../utils/validation';
-import { EvaluationData } from '../types/evaluation';
+import { EvaluationData, DualAnalysisResult } from '../types/evaluation';
 import { Rubric } from '../types/rubric';
 import { RubricApi } from '../utils/rubric-api';
-import ModelSelector, { ModelType } from './ModelSelector';
 
 interface MarkdownImporterProps {
-  onAnalysisComplete: (data: EvaluationData, markdown: string, fileName: string) => void;
+  onAnalysisComplete: (data: DualAnalysisResult, markdown: string, fileName: string) => void;
   isAnalyzing: boolean;
   setIsAnalyzing: (isAnalyzing: boolean) => void;
 }
@@ -22,7 +21,6 @@ const MarkdownImporter: FC<MarkdownImporterProps> = ({ onAnalysisComplete, isAna
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
-  const [selectedModel, setSelectedModel] = useState<ModelType>('claude');
   
   const [rubrics, setRubrics] = useState<Rubric[]>([]);
   const [selectedRubricId, setSelectedRubricId] = useState<string>('');
@@ -180,7 +178,7 @@ const MarkdownImporter: FC<MarkdownImporterProps> = ({ onAnalysisComplete, isAna
           fileName,
           jobId,
           rubricId: selectedRubricId,
-          model: selectedModel
+          directEvaluation: true // Always use direct evaluation for dual analysis
         }),
       });
 
@@ -192,94 +190,44 @@ const MarkdownImporter: FC<MarkdownImporterProps> = ({ onAnalysisComplete, isAna
       const data = await response.json();
       console.log('Analysis response:', data);
 
-      // Check if this is a direct evaluation
-      if (data.direct) {
-        console.log('Received direct evaluation result');
-        if (!data.result) {
-          throw new Error('No result returned from direct evaluation');
-        }
+      // Validate both analyses
+      const claudeValidation = validateEvaluationData(data.claude.result);
+      const geminiValidation = validateEvaluationData(data.gemini.result);
 
-        const validationResult = validateEvaluationData(data.result);
-        if (!validationResult.isValid) {
-          console.warn('Validation issues found:', validationResult.errors);
-          toast.error('The evaluation data has some issues, but we\'ll try to use it anyway');
-        }
-
-        onAnalysisComplete(validationResult.data, markdown, fileName);
-        toast.success('Conversation analyzed successfully!');
-
-        if (fileInputRef.current) {
-          fileInputRef.current.value = '';
-        }
-        setMarkdown(null);
-        setFileName('');
-        setJobId(null);
-        setIsAnalyzing(false);
-        return;
+      if (!claudeValidation.isValid || !geminiValidation.isValid) {
+        console.warn('Validation issues found:', {
+          claude: claudeValidation.errors,
+          gemini: geminiValidation.errors
+        });
+        toast.error('The evaluation data has some issues, but we\'ll try to use it anyway');
       }
 
-      // For job-based evaluation, start polling
-      let retries = 0;
-      const maxRetries = 20;
-      const pollInterval = 3000;
-      let completed = false;
-      const startTime = Date.now();
-
-      const pollJobStatus = async () => {
-        try {
-          console.log(`Polling job status (attempt ${retries + 1}/${maxRetries}) for job ID: ${jobId}`);
-          const statusResponse = await fetch(`/api/check-job-status?jobId=${jobId}`);
-          
-          if (!statusResponse.ok) {
-            throw new Error('Failed to check job status');
-          }
-
-          const statusData = await statusResponse.json();
-          console.log('Job status response:', statusData);
-
-          if (statusData.status === 'completed') {
-            console.log('Job completed successfully');
-            completed = true;
-            if (statusData.result) {
-              const validationResult = validateEvaluationData(statusData.result);
-              if (!validationResult.isValid) {
-                console.warn('Validation issues found:', validationResult.errors);
-                toast.error('The evaluation data has some issues, but we\'ll try to use it anyway');
-              }
-              onAnalysisComplete(validationResult.data, markdown, fileName);
-              toast.success('Conversation analyzed successfully!');
-
-              if (fileInputRef.current) {
-                fileInputRef.current.value = '';
-              }
-              setMarkdown(null);
-              setFileName('');
-              setJobId(null);
-              setIsAnalyzing(false);
-            } else {
-              throw new Error('No results found in completed job');
-            }
-          } else if (statusData.status === 'failed') {
-            throw new Error(statusData.error || 'Job failed');
-          } else if (retries < maxRetries) {
-            retries++;
-            setTimeout(pollJobStatus, pollInterval);
-          } else {
-            throw new Error('Job timed out');
-          }
-        } catch (error) {
-          console.error('Error polling job status:', error);
-          setError(error instanceof Error ? error.message : 'An error occurred');
-          setIsAnalyzing(false);
+      onAnalysisComplete({
+        claude: {
+          result: claudeValidation.data,
+          model: 'claude',
+          direct: true
+        },
+        gemini: {
+          result: geminiValidation.data,
+          model: 'gemini',
+          direct: true
         }
-      };
+      }, markdown, fileName);
 
-      // Start polling for job-based evaluation
-      pollJobStatus();
+      toast.success('Conversation analyzed successfully!');
 
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      setMarkdown(null);
+      setFileName('');
+      setJobId(null);
+      setIsAnalyzing(false);
     } catch (error) {
       console.error('Error analyzing conversation:', error);
-      setError(error instanceof Error ? error.message : 'An error occurred');
+      setError(error instanceof Error ? error.message : 'Failed to analyze conversation');
+      toast.error(error instanceof Error ? error.message : 'Failed to analyze conversation');
       setIsAnalyzing(false);
     }
   };
@@ -316,12 +264,6 @@ const MarkdownImporter: FC<MarkdownImporterProps> = ({ onAnalysisComplete, isAna
         />
       </div>
       
-      <ModelSelector
-        selectedModel={selectedModel}
-        onModelChange={setSelectedModel}
-        disabled={isAnalyzing || loadingRubrics}
-      />
-      
       <div className="mb-6">
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Select Evaluation Rubric
@@ -351,7 +293,7 @@ const MarkdownImporter: FC<MarkdownImporterProps> = ({ onAnalysisComplete, isAna
         )}
       </div>
       
-      <div className="flex space-x-4">
+      <div className="flex gap-2">
         <button
           onClick={analyzeConversation}
           disabled={!markdown || isAnalyzing || loadingRubrics}
@@ -380,6 +322,22 @@ const MarkdownImporter: FC<MarkdownImporterProps> = ({ onAnalysisComplete, isAna
           className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isAnalyzing ? 'Cleaning...' : 'Clean & Download'}
+        </button>
+
+        <button
+          onClick={() => {
+            if (markdown) {
+              // Store markdown content in session storage
+              sessionStorage.setItem('manualAnalysisMarkdown', markdown);
+              sessionStorage.setItem('manualAnalysisFileName', fileName);
+              // Navigate to manual analysis page with rubric ID
+              window.location.href = `/manual-analysis?rubricId=${selectedRubricId}`;
+            }
+          }}
+          disabled={!markdown || isAnalyzing}
+          className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          Manual Analysis
         </button>
       </div>
       

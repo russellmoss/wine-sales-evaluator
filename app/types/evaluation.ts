@@ -16,6 +16,8 @@ export interface ObservationalNote {
 export interface ObservationalNotes {
   productKnowledge: ObservationalNote;    // Evaluation of product knowledge
   handlingObjections: ObservationalNote;   // Evaluation of objection handling
+  customerEngagement: ObservationalNote;   // Evaluation of customer engagement
+  salesTechniques: ObservationalNote;     // Evaluation of sales techniques
 }
 
 // Performance level type - must be one of these exact values
@@ -34,6 +36,7 @@ export interface EvaluationData {
   areasForImprovement: string[];    // Array of exactly 3 areas for improvement
   keyRecommendations: string[];     // Array of exactly 3 key recommendations
   rubricId: string;
+  conversationSummary: string;      // Summary of the conversation being evaluated
   
   // Optional fields
   totalScore?: number;              // Alternative field for overallScore (will be converted)
@@ -272,13 +275,41 @@ export function createEmptyEvaluation(staffName: string): EvaluationData {
     })),
     observationalNotes: {
       productKnowledge: { score: 1, notes: '' },
-      handlingObjections: { score: 1, notes: '' }
+      handlingObjections: { score: 1, notes: '' },
+      customerEngagement: { score: 1, notes: '' },
+      salesTechniques: { score: 1, notes: '' }
     },
     strengths: [],
     areasForImprovement: [],
     keyRecommendations: [],
     rubricId: '',
+    conversationSummary: '',
     criteria: {},
     metadata: {}
+  };
+}
+
+export interface DualAnalysisResult {
+  claude: {
+    result: EvaluationData;
+    model: 'claude';
+    direct: boolean;
+  };
+  gemini: {
+    result: EvaluationData;
+    model: 'gemini';
+    direct: boolean;
+  };
+}
+
+export interface Evaluation {
+  id: string;
+  data: EvaluationData;
+  createdAt: string;
+  updatedAt: string;
+  metadata?: {
+    model?: string;
+    direct?: boolean;
+    processingTime?: number;
   };
 } 

@@ -54,69 +54,39 @@ export async function POST(request: NextRequest) {
     console.log(`API: Using file name: ${fileNameToUse}`);
     
     // Determine if we should use direct evaluation
-    const shouldUseDirectEvaluation = directEvaluation || 
-                                    model === 'claude' || 
-                                    (contentToAnalyze.length <= 50000);
+    const shouldUseDirectEvaluation = directEvaluation || (contentToAnalyze.length <= 50000);
 
-    console.log(`API: Using ${shouldUseDirectEvaluation ? 'direct' : 'job-based'} evaluation`);
-
-    // If direct evaluation is determined, evaluate directly without storing in file system
     if (shouldUseDirectEvaluation) {
-      console.log('API: Performing direct evaluation...');
+      console.log('API: Performing direct evaluation with both models...');
       
-      if (model === 'gemini') {
-        if (!process.env.GEMINI_API_KEY) {
-          console.error('API: GEMINI_API_KEY environment variable is not set');
-          return NextResponse.json({ error: 'GEMINI_API_KEY environment variable is not set' }, { status: 500 });
-        }
+      try {
+        // Run both analyses in parallel
+        const [claudeResult, geminiResult] = await Promise.all([
+          evaluateConversationInChunks(contentToAnalyze, 'Staff Member', new Date().toISOString().split('T')[0], rubricId),
+          evaluateWithGemini(contentToAnalyze, rubricId)
+        ]);
         
-        console.log('API: Using Gemini model for evaluation');
-        try {
-          const result = await evaluateWithGemini(contentToAnalyze, rubricId);
-          console.log('API: Gemini evaluation completed successfully');
-          console.log('API: Gemini result structure:', Object.keys(result));
-          
-          // Return the result directly without storing as a job
-          const response = {
-            result,
-            model: 'gemini',
-            direct: true // Add flag to indicate this is a direct evaluation
-          };
-          
-          console.log('API: Returning direct Gemini response with keys:', Object.keys(response));
-          return NextResponse.json(response);
-        } catch (error) {
-          console.error('API: Error evaluating with Gemini:', error);
-          return NextResponse.json(
-            { error: error instanceof Error ? error.message : 'Error evaluating with Gemini' },
-            { status: 500 }
-          );
-        }
-      } else {
-        // Handle Claude evaluation here
-        console.log('API: Using Claude model for evaluation');
-        try {
-          const result = await evaluateConversationInChunks(contentToAnalyze, rubricId);
-          console.log('API: Claude evaluation completed successfully');
-          console.log('API: Claude result structure:', Object.keys(result));
-          
-          // Return the result directly without storing as a job
-          const response = {
-            result,
+        // Return both results
+        const response = {
+          claude: {
+            result: claudeResult,
             model: 'claude',
-            direct: true, // Add flag to indicate this is a direct evaluation
-            message: 'Evaluation completed successfully using Claude'
-          };
-          
-          console.log('API: Returning direct Claude response with keys:', Object.keys(response));
-          return NextResponse.json(response);
-        } catch (error) {
-          console.error('API: Error evaluating with Claude:', error);
-          return NextResponse.json(
-            { error: error instanceof Error ? error.message : 'Error evaluating with Claude' },
-            { status: 500 }
-          );
-        }
+            direct: true
+          },
+          gemini: {
+            result: geminiResult,
+            model: 'gemini',
+            direct: true
+          }
+        };
+        
+        return NextResponse.json(response);
+      } catch (error) {
+        console.error('API: Error in parallel evaluation:', error);
+        return NextResponse.json(
+          { error: error instanceof Error ? error.message : 'Error in parallel evaluation' },
+          { status: 500 }
+        );
       }
     }
     
