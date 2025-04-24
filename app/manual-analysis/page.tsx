@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { RubricScorer } from '@/app/components/RubricScorer';
 import { RubricApi } from '@/app/utils/rubric-api';
@@ -18,7 +18,7 @@ marked.setOptions({
 // Make the page dynamic to prevent static generation issues
 export const dynamic = 'force-dynamic';
 
-export default function ManualAnalysisPage() {
+function ManualAnalysisContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const conversationId = searchParams.get('conversationId');
@@ -182,5 +182,21 @@ export default function ManualAnalysisPage() {
         conversationSummary={conversationSummary}
       />
     </div>
+  );
+}
+
+export default function ManualAnalysisPage() {
+  return (
+    <Suspense fallback={
+      <div className="p-4">
+        <div className="animate-pulse">
+          <div className="h-4 bg-gray-200 rounded w-3/4 mb-4"></div>
+          <div className="h-4 bg-gray-200 rounded w-1/2 mb-4"></div>
+          <div className="h-4 bg-gray-200 rounded w-2/3"></div>
+        </div>
+      </div>
+    }>
+      <ManualAnalysisContent />
+    </Suspense>
   );
 } 
