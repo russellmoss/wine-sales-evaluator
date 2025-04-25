@@ -8,17 +8,23 @@ import { Rubric } from '@/app/types/rubric';
 import { Button } from '@/app/components/ui/button';
 import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
 import { marked } from 'marked';
+import ConversationPDFExport from '@/components/ConversationPDFExport';
+
+// Color palette for criteria highlighting
+const CRITERIA_COLORS = [
+  'bg-red-100', 'bg-orange-100', 'bg-yellow-100', 'bg-green-100', 'bg-teal-100',
+  'bg-blue-100', 'bg-indigo-100', 'bg-purple-100', 'bg-pink-100', 'bg-gray-100'
+];
 
 // Configure marked to preserve line breaks and add custom renderer for paragraphs
 marked.setOptions({
   breaks: true,
-  gfm: true,
-  renderer: new marked.Renderer({
-    paragraph(text) {
-      return `<p class="mb-4">${text}</p>`;
-    }
-  })
+  gfm: true
 });
+
+const renderer = new marked.Renderer();
+renderer.paragraph = ({ text }: { text: string }) => `<p class="mb-4">${text}</p>`;
+marked.setOptions({ renderer });
 
 // Make the page dynamic to prevent static generation issues
 export const dynamic = 'force-dynamic';
@@ -31,8 +37,18 @@ function ManualAnalysisContent() {
   const [rubric, setRubric] = useState<Rubric | null>(null);
   const [loading, setLoading] = useState(true);
   const [conversationSummary, setConversationSummary] = useState<string>('');
+  const [highlightedContent, setHighlightedContent] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [highlightedSections, setHighlightedSections] = useState<Array<{
+    id: string;
+    criterionId: string;
+    color: string;
+    text: string;
+  }>>([]);
+  const [selectedCriterion, setSelectedCriterion] = useState<string | null>(null);
+  const [selectedText, setSelectedText] = useState<string>('');
+  const [showPDFExport, setShowPDFExport] = useState(false);
 
   useEffect(() => {
     const loadRubric = async () => {
@@ -79,6 +95,7 @@ function ManualAnalysisContent() {
           const formattedMarkdown = storedMarkdown.replace(/\n\n/g, '\n\n\n');
           const html = await marked(formattedMarkdown);
           setConversationSummary(html);
+          setHighlightedContent(html);
           return;
         }
 
@@ -91,6 +108,7 @@ function ManualAnalysisContent() {
           const formattedMarkdown = localStorageMarkdown.replace(/\n\n/g, '\n\n\n');
           const html = await marked(formattedMarkdown);
           setConversationSummary(html);
+          setHighlightedContent(html);
           return;
         }
 
@@ -103,6 +121,7 @@ function ManualAnalysisContent() {
           const formattedMarkdown = urlMarkdown.replace(/\n\n/g, '\n\n\n');
           const html = await marked(urlMarkdown);
           setConversationSummary(html);
+          setHighlightedContent(html);
           return;
         }
 
@@ -116,6 +135,76 @@ function ManualAnalysisContent() {
 
     loadConversation();
   }, [searchParams]);
+
+  const handleTextSelection = () => {
+    const selection = window.getSelection();
+    if (!selection || !selectedCriterion) return;
+
+    const selectedText = selection.toString();
+    if (!selectedText) return;
+
+    const range = selection.getRangeAt(0);
+    const criterionIndex = rubric?.criteria.findIndex(c => c.id === selectedCriterion) || 0;
+    const color = CRITERIA_COLORS[criterionIndex % CRITERIA_COLORS.length];
+
+    // Create a unique ID for this highlight
+    const highlightId = `highlight-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+    // Store the highlight information
+    setHighlightedSections(prev => [
+      ...prev,
+      { 
+        id: highlightId,
+        criterionId: selectedCriterion,
+        color,
+        text: selectedText
+      }
+    ]);
+
+    // Update the highlighted content
+    const highlightElement = `<span class="${color} px-1 rounded" data-highlight-id="${highlightId}">${selectedText}</span>`;
+    const newContent = highlightedContent.replace(selectedText, highlightElement);
+    setHighlightedContent(newContent);
+
+    // Clear selection
+    selection.removeAllRanges();
+  };
+
+  const getHighlightedContent = (content: string) => {
+    // If there are no highlights yet, just return the content
+    if (highlightedSections.length === 0) return content;
+
+    // Create a temporary div to parse the HTML
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = content;
+
+    // Apply highlights to the content
+    highlightedSections.forEach(section => {
+      const highlightElement = document.createElement('span');
+      highlightElement.className = `${section.color} px-1 rounded`;
+      highlightElement.setAttribute('data-highlight-id', section.id);
+      highlightElement.textContent = section.text;
+
+      // Replace the text with the highlight element
+      const textNodes = Array.from(tempDiv.childNodes).filter(node => 
+        node.nodeType === Node.TEXT_NODE && node.textContent?.includes(section.text)
+      );
+
+      textNodes.forEach(node => {
+        const newContent = node.textContent?.replace(
+          section.text,
+          highlightElement.outerHTML
+        );
+        if (newContent) {
+          const newDiv = document.createElement('div');
+          newDiv.innerHTML = newContent;
+          node.parentNode?.replaceChild(newDiv.firstChild as Node, node);
+        }
+      });
+    });
+
+    return tempDiv.innerHTML;
+  };
 
   if (error) {
     return (
@@ -177,11 +266,23 @@ function ManualAnalysisContent() {
             <ArrowLeft className="mr-2 h-4 w-4" />
             Go Back
           </Button>
+          <Button
+            onClick={() => setShowPDFExport(true)}
+            className="bg-blue-600 text-white hover:bg-blue-700"
+          >
+            Export Conversation to PDF
+          </Button>
         </div>
-        
+
         <div className="mb-8">
           <h1 className="text-2xl font-bold mb-2">Manual Analysis</h1>
-          <div className="prose max-w-none [&>p]:mb-4 [&>p:last-child]:mb-0" dangerouslySetInnerHTML={{ __html: conversationSummary }} />
+          <div 
+            className="prose max-w-none [&>p]:mb-4 [&>p:last-child]:mb-0"
+            onMouseUp={handleTextSelection}
+            dangerouslySetInnerHTML={{ 
+              __html: highlightedContent 
+            }} 
+          />
         </div>
       </div>
 
@@ -211,11 +312,23 @@ function ManualAnalysisContent() {
                 rubric={rubric}
                 conversationId={conversationId || ''}
                 conversationSummary={conversationSummary}
+                selectedCriterion={selectedCriterion}
+                onCriterionSelect={setSelectedCriterion}
+                highlightedSections={highlightedSections}
+                criteriaColors={CRITERIA_COLORS}
               />
             </div>
           )}
         </div>
       </div>
+
+      {showPDFExport && (
+        <ConversationPDFExport
+          markdown={sessionStorage.getItem('manualAnalysisMarkdown') || ''}
+          highlightedSections={highlightedSections}
+          onClose={() => setShowPDFExport(false)}
+        />
+      )}
     </div>
   );
 }
