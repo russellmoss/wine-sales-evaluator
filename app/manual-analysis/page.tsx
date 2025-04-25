@@ -8,6 +8,7 @@ import { Rubric } from '@/app/types/rubric';
 import { Button } from '@/app/components/ui/button';
 import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
 import { marked } from 'marked';
+import type { Token } from 'marked';
 import ConversationPDFExport from '@/components/ConversationPDFExport';
 
 // Color palette for criteria highlighting
@@ -23,7 +24,9 @@ marked.setOptions({
 });
 
 const renderer = new marked.Renderer();
-renderer.paragraph = ({ text }: { text: string }) => `<p class="mb-4">${text}</p>`;
+renderer.paragraph = ({ text }: { text: string }) => `<p class="mb-4 whitespace-pre-wrap">${text}</p>`;
+renderer.list = (token: Token) => `<ul class="list-disc pl-6 mb-4">${(token as any).items.map((item: { text: string }) => `<li class="mb-2">${item.text}</li>`).join('')}</ul>`;
+renderer.text = (token: Token) => (token as any).text;
 marked.setOptions({ renderer });
 
 // Make the page dynamic to prevent static generation issues
@@ -143,7 +146,6 @@ function ManualAnalysisContent() {
     const selectedText = selection.toString();
     if (!selectedText) return;
 
-    const range = selection.getRangeAt(0);
     const criterionIndex = rubric?.criteria.findIndex(c => c.id === selectedCriterion) || 0;
     const color = CRITERIA_COLORS[criterionIndex % CRITERIA_COLORS.length];
 
@@ -161,8 +163,10 @@ function ManualAnalysisContent() {
       }
     ]);
 
-    // Update the highlighted content
+    // Create the highlight element
     const highlightElement = `<span class="${color} px-1 rounded" data-highlight-id="${highlightId}">${selectedText}</span>`;
+
+    // Update the highlighted content by replacing the selected text with the highlight element
     const newContent = highlightedContent.replace(selectedText, highlightElement);
     setHighlightedContent(newContent);
 
