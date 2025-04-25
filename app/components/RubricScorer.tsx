@@ -60,12 +60,29 @@ export function RubricScorer({
       const feedback = evaluationData.criteria[criterion.id]?.feedback || '';
       const weightedScore = score * criterion.weight;
       
+      // Get highlighted sections for this criterion
+      const criterionHighlights = highlightedSections.filter(
+        section => section.criterionId === criterion.id
+      );
+      
+      // Combine feedback with highlighted sections
+      let notes = feedback;
+      if (criterionHighlights.length > 0) {
+        if (notes) {
+          notes += '\n\n';
+        }
+        notes += 'Highlighted Sections:';
+        criterionHighlights.forEach(highlight => {
+          notes += `\n• ${highlight.text}`;
+        });
+      }
+      
       return {
         criterion: criterion.name,
         weight: criterion.weight,
         score,
         weightedScore,
-        notes: feedback
+        notes
       };
     });
 
@@ -85,7 +102,7 @@ export function RubricScorer({
       performanceLevel,
       criteriaScores
     }));
-  }, [evaluationData.criteria, rubric.criteria]);
+  }, [evaluationData.criteria, rubric.criteria, highlightedSections]);
 
   const handleScoreChange = (criterionId: string, score: number) => {
     setEvaluationData(prev => ({
