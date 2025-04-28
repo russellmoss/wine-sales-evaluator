@@ -1,0 +1,372 @@
+{
+  "name": "Judd's Hill Wine Sales Excellence Rubric",
+  "description": "This rubric evaluates wine sales professionals at Judd's Hill on their ability to engage sophisticated wine enthusiasts, personalize the tasting experience, effectively present the wine club, close sales, upsell products, and capture customer data through verbal communication and sales techniques.",
+  "isDefault": false,
+  "criteria": [
+    {
+      "id": "criterion-1",
+      "name": "Wine Club Presentation",
+      "description": "Effectively communicates the unique benefits and value of Judd's Hill wine club membership, tailoring the presentation to the guests' preferences for European-style wines with lower alcohol content, and their existing membership experience with Silver Oak.",
+      "weight": 20,
+      "scoringLevels": [
+        {
+          "score": 1,
+          "description": "Needs Improvement: Demonstrates minimal competency with significant gaps in approach; misses key opportunities to engage customers effectively; uses generic or inappropriate language; fails to address customer needs or preferences.",
+          "level": "Needs Improvement"
+        },
+        {
+          "score": 2,
+          "description": "Developing: Shows basic competency but lacks refinement; inconsistently applies sales techniques; demonstrates partial understanding of customer needs; misses some opportunities for personalization or sales advancement.",
+          "level": "Developing"
+        },
+        {
+          "score": 3,
+          "description": "Proficient: Demonstrates solid competency with generally effective approach; addresses most customer needs appropriately; applies sales techniques with reasonable success; shows good understanding of products and customer preferences.",
+          "level": "Proficient"
+        },
+        {
+          "score": 4,
+          "description": "Strong: Exhibits advanced competency with highly effective approach; consistently addresses customer needs with personalized solutions; applies sophisticated sales techniques; demonstrates excellent product knowledge and customer insight.",
+          "level": "Strong"
+        },
+        {
+          "score": 5,
+          "description": "Exceptional: Displays mastery with an outstanding approach that exceeds expectations; anticipates and addresses all customer needs with highly personalized solutions; applies expert sales techniques with natural fluency; demonstrates perfect timing and exceptional customer understanding.",
+          "level": "Exceptional"
+        }
+      ]
+    },
+    {
+      "id": "criterion-2",
+      "name": "Closing Techniques",
+      "description": "Confidently asks for the sale with clear, direct language that makes it easy for guests to purchase wine, using appropriate timing based on buying signals and creating a sense of exclusivity around Judd's Hill small-lot handcrafted wines.",
+      "weight": 15,
+      "scoringLevels": [
+        {
+          "score": 1,
+          "description": "Needs Improvement: Demonstrates minimal competency with significant gaps in approach; misses key opportunities to engage customers effectively; uses generic or inappropriate language; fails to address customer needs or preferences.",
+          "level": "Needs Improvement"
+        },
+        {
+          "score": 2,
+          "description": "Developing: Shows basic competency but lacks refinement; inconsistently applies sales techniques; demonstrates partial understanding of customer needs; misses some opportunities for personalization or sales advancement.",
+          "level": "Developing"
+        },
+        {
+          "score": 3,
+          "description": "Proficient: Demonstrates solid competency with generally effective approach; addresses most customer needs appropriately; applies sales techniques with reasonable success; shows good understanding of products and customer preferences.",
+          "level": "Proficient"
+        },
+        {
+          "score": 4,
+          "description": "Strong: Exhibits advanced competency with highly effective approach; consistently addresses customer needs with personalized solutions; applies sophisticated sales techniques; demonstrates excellent product knowledge and customer insight.",
+          "level": "Strong"
+        },
+        {
+          "score": 5,
+          "description": "Exceptional: Displays mastery with an outstanding approach that exceeds expectations; anticipates and addresses all customer needs with highly personalized solutions; applies expert sales techniques with natural fluency; demonstrates perfect timing and exceptional customer understanding.",
+          "level": "Exceptional"
+        }
+      ]
+    },
+    {
+      "id": "criterion-3",
+      "name": "Upselling Strategy",
+      "description": "Skillfully encourages guests to purchase additional bottles beyond their initial intention through value-based suggestions, case discounts, limited availability messaging, and pairing recommendations for their new Yountville home.",
+      "weight": 12,
+      "scoringLevels": [
+        {
+          "score": 1,
+          "description": "Needs Improvement: Demonstrates minimal competency with significant gaps in approach; misses key opportunities to engage customers effectively; uses generic or inappropriate language; fails to address customer needs or preferences.",
+          "level": "Needs Improvement"
+        },
+        {
+          "score": 2,
+          "description": "Developing: Shows basic competency but lacks refinement; inconsistently applies sales techniques; demonstrates partial understanding of customer needs; misses some opportunities for personalization or sales advancement.",
+          "level": "Developing"
+        },
+        {
+          "score": 3,
+          "description": "Proficient: Demonstrates solid competency with generally effective approach; addresses most customer needs appropriately; applies sales techniques with reasonable success; shows good understanding of products and customer preferences.",
+          "level": "Proficient"
+        },
+        {
+          "score": 4,
+          "description": "Strong: Exhibits advanced competency with highly effective approach; consistently addresses customer needs with personalized solutions; applies sophisticated sales techniques; demonstrates excellent product knowledge and customer insight.",
+          "level": "Strong"
+        },
+        {
+          "score": 5,
+          "description": "Exceptional: Displays mastery with an outstanding approach that exceeds expectations; anticipates and addresses all customer needs with highly personalized solutions; applies expert sales techniques with natural fluency; demonstrates perfect timing and exceptional customer understanding.",
+          "level": "Exceptional"
+        }
+      ]
+    },
+    {
+      "id": "criterion-4",
+      "name": "Personalization of Experience",
+      "description": "Tailors the tasting experience to the guests' sophisticated palates, acknowledging their preference for Napa Cabernet Sauvignon and Chardonnay while avoiding Viognier, and referencing wine ratings from publications they value.",
+      "weight": 12,
+      "scoringLevels": [
+        {
+          "score": 1,
+          "description": "Needs Improvement: Demonstrates minimal competency with significant gaps in approach; misses key opportunities to engage customers effectively; uses generic or inappropriate language; fails to address customer needs or preferences.",
+          "level": "Needs Improvement"
+        },
+        {
+          "score": 2,
+          "description": "Developing: Shows basic competency but lacks refinement; inconsistently applies sales techniques; demonstrates partial understanding of customer needs; misses some opportunities for personalization or sales advancement.",
+          "level": "Developing"
+        },
+        {
+          "score": 3,
+          "description": "Proficient: Demonstrates solid competency with generally effective approach; addresses most customer needs appropriately; applies sales techniques with reasonable success; shows good understanding of products and customer preferences.",
+          "level": "Proficient"
+        },
+        {
+          "score": 4,
+          "description": "Strong: Exhibits advanced competency with highly effective approach; consistently addresses customer needs with personalized solutions; applies sophisticated sales techniques; demonstrates excellent product knowledge and customer insight.",
+          "level": "Strong"
+        },
+        {
+          "score": 5,
+          "description": "Exceptional: Displays mastery with an outstanding approach that exceeds expectations; anticipates and addresses all customer needs with highly personalized solutions; applies expert sales techniques with natural fluency; demonstrates perfect timing and exceptional customer understanding.",
+          "level": "Exceptional"
+        }
+      ]
+    },
+    {
+      "id": "criterion-5",
+      "name": "Initial Engagement",
+      "description": "Creates a warm, welcoming first impression by using guests' names (Jamie and Robert), acknowledging their new home purchase in Yountville, and establishing rapport through relevant questions about their wine preferences and Silver Oak membership.",
+      "weight": 10,
+      "scoringLevels": [
+        {
+          "score": 1,
+          "description": "Needs Improvement: Demonstrates minimal competency with significant gaps in approach; misses key opportunities to engage customers effectively; uses generic or inappropriate language; fails to address customer needs or preferences.",
+          "level": "Needs Improvement"
+        },
+        {
+          "score": 2,
+          "description": "Developing: Shows basic competency but lacks refinement; inconsistently applies sales techniques; demonstrates partial understanding of customer needs; misses some opportunities for personalization or sales advancement.",
+          "level": "Developing"
+        },
+        {
+          "score": 3,
+          "description": "Proficient: Demonstrates solid competency with generally effective approach; addresses most customer needs appropriately; applies sales techniques with reasonable success; shows good understanding of products and customer preferences.",
+          "level": "Proficient"
+        },
+        {
+          "score": 4,
+          "description": "Strong: Exhibits advanced competency with highly effective approach; consistently addresses customer needs with personalized solutions; applies sophisticated sales techniques; demonstrates excellent product knowledge and customer insight.",
+          "level": "Strong"
+        },
+        {
+          "score": 5,
+          "description": "Exceptional: Displays mastery with an outstanding approach that exceeds expectations; anticipates and addresses all customer needs with highly personalized solutions; applies expert sales techniques with natural fluency; demonstrates perfect timing and exceptional customer understanding.",
+          "level": "Exceptional"
+        }
+      ]
+    },
+    {
+      "id": "criterion-6",
+      "name": "Product Knowledge",
+      "description": "Demonstrates comprehensive understanding of Judd's Hill wines, including production methods, tasting notes, vintage variations, and how they compare to European-style wines and other Napa Valley producers like Silver Oak.",
+      "weight": 8,
+      "scoringLevels": [
+        {
+          "score": 1,
+          "description": "Needs Improvement: Demonstrates minimal competency with significant gaps in approach; misses key opportunities to engage customers effectively; uses generic or inappropriate language; fails to address customer needs or preferences.",
+          "level": "Needs Improvement"
+        },
+        {
+          "score": 2,
+          "description": "Developing: Shows basic competency but lacks refinement; inconsistently applies sales techniques; demonstrates partial understanding of customer needs; misses some opportunities for personalization or sales advancement.",
+          "level": "Developing"
+        },
+        {
+          "score": 3,
+          "description": "Proficient: Demonstrates solid competency with generally effective approach; addresses most customer needs appropriately; applies sales techniques with reasonable success; shows good understanding of products and customer preferences.",
+          "level": "Proficient"
+        },
+        {
+          "score": 4,
+          "description": "Strong: Exhibits advanced competency with highly effective approach; consistently addresses customer needs with personalized solutions; applies sophisticated sales techniques; demonstrates excellent product knowledge and customer insight.",
+          "level": "Strong"
+        },
+        {
+          "score": 5,
+          "description": "Exceptional: Displays mastery with an outstanding approach that exceeds expectations; anticipates and addresses all customer needs with highly personalized solutions; applies expert sales techniques with natural fluency; demonstrates perfect timing and exceptional customer understanding.",
+          "level": "Exceptional"
+        }
+      ]
+    },
+    {
+      "id": "criterion-7",
+      "name": "Objection Handling",
+      "description": "Addresses concerns or hesitations about wine purchases or club membership with confidence, providing thoughtful responses that overcome objections while maintaining a consultative rather than pushy approach.",
+      "weight": 8,
+      "scoringLevels": [
+        {
+          "score": 1,
+          "description": "Needs Improvement: Demonstrates minimal competency with significant gaps in approach; misses key opportunities to engage customers effectively; uses generic or inappropriate language; fails to address customer needs or preferences.",
+          "level": "Needs Improvement"
+        },
+        {
+          "score": 2,
+          "description": "Developing: Shows basic competency but lacks refinement; inconsistently applies sales techniques; demonstrates partial understanding of customer needs; misses some opportunities for personalization or sales advancement.",
+          "level": "Developing"
+        },
+        {
+          "score": 3,
+          "description": "Proficient: Demonstrates solid competency with generally effective approach; addresses most customer needs appropriately; applies sales techniques with reasonable success; shows good understanding of products and customer preferences.",
+          "level": "Proficient"
+        },
+        {
+          "score": 4,
+          "description": "Strong: Exhibits advanced competency with highly effective approach; consistently addresses customer needs with personalized solutions; applies sophisticated sales techniques; demonstrates excellent product knowledge and customer insight.",
+          "level": "Strong"
+        },
+        {
+          "score": 5,
+          "description": "Exceptional: Displays mastery with an outstanding approach that exceeds expectations; anticipates and addresses all customer needs with highly personalized solutions; applies expert sales techniques with natural fluency; demonstrates perfect timing and exceptional customer understanding.",
+          "level": "Exceptional"
+        }
+      ]
+    },
+    {
+      "id": "criterion-8",
+      "name": "Data Capture",
+      "description": "Effectively collects contact information (email, phone number) through natural conversation, wine club sign-up process, email receipts, or other appropriate methods that enhance the customer relationship.",
+      "weight": 7,
+      "scoringLevels": [
+        {
+          "score": 1,
+          "description": "Needs Improvement: Demonstrates minimal competency with significant gaps in approach; misses key opportunities to engage customers effectively; uses generic or inappropriate language; fails to address customer needs or preferences.",
+          "level": "Needs Improvement"
+        },
+        {
+          "score": 2,
+          "description": "Developing: Shows basic competency but lacks refinement; inconsistently applies sales techniques; demonstrates partial understanding of customer needs; misses some opportunities for personalization or sales advancement.",
+          "level": "Developing"
+        },
+        {
+          "score": 3,
+          "description": "Proficient: Demonstrates solid competency with generally effective approach; addresses most customer needs appropriately; applies sales techniques with reasonable success; shows good understanding of products and customer preferences.",
+          "level": "Proficient"
+        },
+        {
+          "score": 4,
+          "description": "Strong: Exhibits advanced competency with highly effective approach; consistently addresses customer needs with personalized solutions; applies sophisticated sales techniques; demonstrates excellent product knowledge and customer insight.",
+          "level": "Strong"
+        },
+        {
+          "score": 5,
+          "description": "Exceptional: Displays mastery with an outstanding approach that exceeds expectations; anticipates and addresses all customer needs with highly personalized solutions; applies expert sales techniques with natural fluency; demonstrates perfect timing and exceptional customer understanding.",
+          "level": "Exceptional"
+        }
+      ]
+    },
+    {
+      "id": "criterion-9",
+      "name": "Concluding Interaction",
+      "description": "Ends the tasting experience memorably by thanking guests by name, referencing specific aspects of their visit, and extending a genuine invitation to return, particularly as new Yountville residents.",
+      "weight": 5,
+      "scoringLevels": [
+        {
+          "score": 1,
+          "description": "Needs Improvement: Demonstrates minimal competency with significant gaps in approach; misses key opportunities to engage customers effectively; uses generic or inappropriate language; fails to address customer needs or preferences.",
+          "level": "Needs Improvement"
+        },
+        {
+          "score": 2,
+          "description": "Developing: Shows basic competency but lacks refinement; inconsistently applies sales techniques; demonstrates partial understanding of customer needs; misses some opportunities for personalization or sales advancement.",
+          "level": "Developing"
+        },
+        {
+          "score": 3,
+          "description": "Proficient: Demonstrates solid competency with generally effective approach; addresses most customer needs appropriately; applies sales techniques with reasonable success; shows good understanding of products and customer preferences.",
+          "level": "Proficient"
+        },
+        {
+          "score": 4,
+          "description": "Strong: Exhibits advanced competency with highly effective approach; consistently addresses customer needs with personalized solutions; applies sophisticated sales techniques; demonstrates excellent product knowledge and customer insight.",
+          "level": "Strong"
+        },
+        {
+          "score": 5,
+          "description": "Exceptional: Displays mastery with an outstanding approach that exceeds expectations; anticipates and addresses all customer needs with highly personalized solutions; applies expert sales techniques with natural fluency; demonstrates perfect timing and exceptional customer understanding.",
+          "level": "Exceptional"
+        }
+      ]
+    },
+    {
+      "id": "criterion-10",
+      "name": "Restaurant Recommendations",
+      "description": "Provides thoughtful, personalized dining suggestions in the Napa Valley area that align with the guests' sophisticated preferences, creating additional value beyond the tasting experience.",
+      "weight": 3,
+      "scoringLevels": [
+        {
+          "score": 1,
+          "description": "Needs Improvement: Demonstrates minimal competency with significant gaps in approach; misses key opportunities to engage customers effectively; uses generic or inappropriate language; fails to address customer needs or preferences.",
+          "level": "Needs Improvement"
+        },
+        {
+          "score": 2,
+          "description": "Developing: Shows basic competency but lacks refinement; inconsistently applies sales techniques; demonstrates partial understanding of customer needs; misses some opportunities for personalization or sales advancement.",
+          "level": "Developing"
+        },
+        {
+          "score": 3,
+          "description": "Proficient: Demonstrates solid competency with generally effective approach; addresses most customer needs appropriately; applies sales techniques with reasonable success; shows good understanding of products and customer preferences.",
+          "level": "Proficient"
+        },
+        {
+          "score": 4,
+          "description": "Strong: Exhibits advanced competency with highly effective approach; consistently addresses customer needs with personalized solutions; applies sophisticated sales techniques; demonstrates excellent product knowledge and customer insight.",
+          "level": "Strong"
+        },
+        {
+          "score": 5,
+          "description": "Exceptional: Displays mastery with an outstanding approach that exceeds expectations; anticipates and addresses all customer needs with highly personalized solutions; applies expert sales techniques with natural fluency; demonstrates perfect timing and exceptional customer understanding.",
+          "level": "Exceptional"
+        }
+      ]
+    }
+  ],
+  "performanceLevels": [
+    {
+      "name": "Needs Improvement",
+      "minScore": 0,
+      "maxScore": 60,
+      "description": "Shows significant gaps in wine sales fundamentals. Fails to personalize the experience to Jamie and Robert's sophisticated preferences. Wine club presentation is weak or missing, rarely asks for the sale, and makes no effective upselling attempts. Data capture is minimal or absent, and engagement lacks warmth and personalization."
+    },
+    {
+      "name": "Developing",
+      "minScore": 60,
+      "maxScore": 70,
+      "description": "Demonstrates basic wine sales skills with inconsistent execution. Creates a somewhat generic experience that partially addresses Jamie and Robert's preferences. Wine club presentation lacks compelling benefits, sales requests seem uncomfortable, and upselling attempts are minimal. Data capture is incomplete and engagement shows limited personalization."
+    },
+    {
+      "name": "Proficient",
+      "minScore": 70,
+      "maxScore": 80,
+      "description": "Shows solid wine sales competency with generally effective approaches. Creates a reasonably personalized experience that addresses most of Jamie and Robert's preferences. Presents the wine club adequately, asks for the sale, and attempts upselling with moderate success. Captures basic customer data and maintains positive engagement throughout the interaction."
+    },
+    {
+      "name": "Strong",
+      "minScore": 80,
+      "maxScore": 90,
+      "description": "Demonstrates advanced wine sales capabilities with highly effective techniques. Creates a personalized experience for Jamie and Robert that acknowledges their sophisticated palate and new Yountville residence. Presents the wine club persuasively, asks for the sale confidently, and successfully upsells with good timing. Captures customer data effectively while maintaining authentic engagement."
+    },
+    {
+      "name": "Exceptional",
+      "minScore": 90,
+      "maxScore": 100,
+      "description": "Represents the gold standard in wine sales excellence. Consistently delivers a highly personalized experience that perfectly addresses Jamie and Robert's sophisticated preferences. Masterfully presents the wine club with compelling benefits, confidently asks for the sale, and skillfully upsells with natural elegance. Captures all necessary customer data while building genuine rapport that reflects Judd's Hill's boutique character."
+    }
+  ],
+  "id": "0da9e0ac-55f0-4ab1-98d8-e0822b7a85f3",
+  "createdAt": "2025-04-28T20:48:45.450Z",
+  "updatedAt": "2025-04-28T20:48:45.450Z"
+}

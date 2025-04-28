@@ -63,13 +63,34 @@ async function generateRubricWithClaude(
   const systemPrompt = `You are an expert wine sales coach who creates detailed evaluation rubrics for winery staff. 
 Your task is to create a comprehensive evaluation rubric based on the provided scenario information and specific requirements.
 
+IMPORTANT: This rubric must ONLY evaluate aspects of the interaction that can be assessed through text analysis. Focus on:
+1. Verbal communication and language used
+2. Sales techniques and approaches
+3. Product knowledge and storytelling
+4. Customer engagement and rapport building
+5. Handling objections and questions
+6. Wine club presentation and benefits communication
+7. Data capture and follow-up strategies
+
+DO NOT include criteria that require visual or physical assessment, such as:
+- Body language
+- Physical appearance
+- Pouring techniques
+- Glass handling
+- Room setup
+- Physical gestures
+- Facial expressions
+- Physical proximity
+- Tasting room cleanliness
+- Wine presentation
+
 The scenario JSON describes a specific winery sales situation. 
 The requirements describe what areas the rubric should focus on evaluating.
 
 Creating an effective wine sales evaluation rubric involves:
-1. Analyzing what skills and behaviors are most important in this specific scenario
+1. Analyzing what verbal skills and communication techniques are most important in this specific scenario
 2. Creating criteria that align with both the scenario context and the stated requirements
-3. Ensuring criteria have clear descriptions that can be consistently evaluated
+3. Ensuring criteria have clear descriptions that can be consistently evaluated through text analysis
 4. Creating meaningful scoring descriptions for each level (1-5)
 5. Assigning appropriate weights to each criterion based on importance
 
@@ -137,7 +158,8 @@ IMPORTANT RULES:
 4. Make the rubric specific to the winery scenario
 5. Ensure all JSON is valid with no syntax errors
 6. Provide rich, detailed descriptions for each scoring level
-7. Respond ONLY with the JSON object, no explanations before or after`;
+7. Respond ONLY with the JSON object, no explanations before or after
+8. ONLY include criteria that can be evaluated through text analysis`;
 
   try {
     // Call Claude API
@@ -153,7 +175,7 @@ IMPORTANT RULES:
 
 RUBRIC REQUIREMENTS: ${requirements}
 
-Based on this scenario and these requirements, create a detailed wine sales evaluation rubric with 10 criteria and appropriate weights.`
+Based on this scenario and these requirements, create a detailed wine sales evaluation rubric with 10 criteria and appropriate weights. Focus ONLY on aspects that can be evaluated through text analysis.`
         }
       ],
     });
