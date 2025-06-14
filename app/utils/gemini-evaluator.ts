@@ -171,9 +171,9 @@ IMPORTANT REQUIREMENTS:
     
     // Now proceed with the generateContent call
     // Log the request details for debugging
-    const requestUrl = 'https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro-001:generateContent';
+    const requestUrl = 'https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro:generateContent';
     console.log(`Request URL: ${requestUrl}`);
-    console.log('Using Gemini model:', 'models/gemini-1.5-pro-001');
+    console.log('Using Gemini model:', 'models/gemini-1.5-pro');
     
     // Log the complete URL including API key
     console.log('Full Gemini API URL:', `${requestUrl}?key=${process.env.GEMINI_API_KEY}`);
